@@ -212,8 +212,14 @@ thread_create (const char *name, int priority,
 
   intr_set_level (old_level);
 
+  if (priority > thread_get_priority()) {
+    list_push_front(&ready_list, &t->elem);
+    thread_yield();
+  } else {
+    thread_unblock(t);
+  }
   /* Add to run queue. */
-  thread_unblock (t);
+  //thread_unblock (t);
 
   return tid;
 }
@@ -252,7 +258,8 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  //list_push_back (&ready_list, &t->elem);
+  list_insert_ordered(&ready_list, &t->elem, &sort_priority_queue, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -358,8 +365,10 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread) {
+    //list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered(&ready_list, &cur->elem, &sort_priority_queue, NULL);
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -383,18 +392,45 @@ thread_foreach (thread_action_func *func, void *aux)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void
-thread_set_priority (int new_priority) 
-{
+void thread_set_priority (int new_priority) {
   thread_current ()->priority = new_priority;
+  thread_current()->donatedPriority = 0;
+
+  list_sort(&ready_list, &sort_priority_queue, NULL);
+
+  struct thread *rqHead = list_entry(list_front(&ready_list), struct thread, elem);
+  if (thread_get_other_priority(rqHead) > thread_get_priority()) {
+    thread_yield();
+  }
+}
+
+void thread_donate_priority(struct thread *t, int new_priority) {
+
+  ASSERT (intr_get_level() == INTR_OFF);
+  //printf("Donating priority %d to thread\n", new_priority);
+  //printf("Before: thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
+  //printf("Current Thread Donated Priority is %d\n", t->donatedPriority);
+  t->donatedPriority += new_priority;
+  t->deadlockResolved = 1;
+  //printf("After:  thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
+
+  //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
+  list_sort(&ready_list, &sort_priority_queue, NULL);
+  //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
+  if (thread_get_other_priority(t) > thread_get_priority()) {
+    thread_yield();
+  }
 }
 
 /* Returns the current thread's priority. */
-int
-thread_get_priority (void) 
-{
-  return thread_current ()->priority;
+int thread_get_priority (void) {
+  return thread_current()->priority + thread_current()->donatedPriority;
 }
+
+int thread_get_other_priority (struct thread *t) {
+  return t->priority + t->donatedPriority;
+}
+
 
 /* Sets the current thread's nice value to NICE. */
 void
@@ -511,6 +547,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->donatedPriority = 0;
+  t->deadlockResolved = -1;
+  t->lockWant = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);
 }
@@ -533,9 +572,7 @@ alloc_frame (struct thread *t, size_t size)
    empty.  (If the running thread can continue running, then it
    will be in the run queue.)  If the run queue is empty, return
    idle_thread. */
-static struct thread *
-next_thread_to_run (void) 
-{
+static struct thread *next_thread_to_run (void) {
   if (list_empty (&ready_list))
     return idle_thread;
   else
@@ -633,6 +670,18 @@ bool sort_sleep(const struct list_elem *a, const struct list_elem *b, void *aux 
   struct thread *other = list_entry(b, struct thread, sleepElem);
 
   return t->wakeUpTime < other->wakeUpTime;
+}
+
+bool sort_priority_queue(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED) {
+
+  ASSERT(a != NULL && b != NULL);
+
+  struct thread *t = list_entry(a, struct thread, elem);
+  struct thread *other = list_entry(b, struct thread, elem);
+
+  return (t->priority + t->donatedPriority) > \
+    (other->priority + other->donatedPriority);
+
 }
 
 /* Offset of `stack' member within `struct thread'.

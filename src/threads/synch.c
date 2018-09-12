@@ -189,14 +189,27 @@ lock_init (struct lock *lock)
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void
-lock_acquire (struct lock *lock)
-{
+void lock_acquire (struct lock *lock) {
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
 
+  //race condition if we check lock->holder == null without lock /intr off
+  enum intr_level old_level;
+  old_level = intr_disable();
+
+  struct thread *c_thread = thread_current();
+  c_thread->lockWant = lock;
+  if (lock->holder != NULL && thread_get_priority() > thread_get_other_priority(lock->holder)) {
+    //printf("Donating Priority\n");
+    //printf("Priority Before %d\n", thread_get_other_priority(lock->holder));
+    thread_donate_priority(lock->holder, thread_get_priority() - thread_get_other_priority(lock->holder));
+    //printf("Priority After %d\n", thread_get_other_priority(lock->holder));
+  }
+
+  intr_set_level(old_level);
   sema_down (&lock->semaphore);
+  thread_current()->lockWant = NULL;
   lock->holder = thread_current ();
 }
 
