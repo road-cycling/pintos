@@ -374,6 +374,24 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+void thread_resolve_deadlock(struct lock *l) {
+  ASSERT (intr_get_level() == INTR_OFF);
+
+  int cur_thread_pri = thread_get_priority();
+  struct thread *t = l->holder;
+  while (t != NULL) {
+    thread_donate_priority(t, cur_thread_pri - thread_get_other_priority(t));
+    list_remove(&t->elem);
+    list_push_front(&ready_list, &t->elem);
+
+    if (t->lockWant != NULL && t->lockWant->holder != NULL) {
+      t = t->lockWant->holder;
+    } else {
+      break;
+    }
+  }
+}
+
 /* Invoke function 'func' on all threads, passing along 'aux'.
    This function must be called with interrupts off. */
 void
@@ -410,16 +428,16 @@ void thread_donate_priority(struct thread *t, int new_priority) {
   //printf("Donating priority %d to thread\n", new_priority);
   //printf("Before: thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
   //printf("Current Thread Donated Priority is %d\n", t->donatedPriority);
-  t->donatedPriority += new_priority;
+  t->donatedPriority = new_priority;
   t->deadlockResolved = 1;
   //printf("After:  thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
 
   //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
-  list_sort(&ready_list, &sort_priority_queue, NULL);
+  //list_sort(&ready_list, &sort_priority_queue, NULL);
   //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
-  if (thread_get_other_priority(t) > thread_get_priority()) {
-    thread_yield();
-  }
+  // if (thread_get_other_priority(t) > thread_get_priority()) {
+  //   thread_yield();
+  // }
 }
 
 /* Returns the current thread's priority. */
