@@ -74,7 +74,7 @@ sema_down (struct semaphore *sema)
   intr_set_level (old_level);
 }
 
-void sema_down_added (struct semaphore *sema, int added) {
+void sema_down_added (struct semaphore *sema, int added UNUSED) {
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
@@ -223,46 +223,32 @@ lock_init (struct lock *lock)
 
 void lock_acquire (struct lock *lock) {
   //printf("Acquiring Lock\n");
-  ASSERT (lock != NULL);
-  ASSERT (!intr_context ());
-  ASSERT (!lock_held_by_current_thread (lock));
-  ASSERT (thread_current()->donationsRec < 8);
-  //race condition if we check lock->holder == null without lock /intr off
-  enum intr_level old_level;
-  old_level = intr_disable();
+  // ASSERT (lock != NULL);
+  // ASSERT (!intr_context ());
+  // ASSERT (!lock_held_by_current_thread (lock));
 
-  if (lock->holder != NULL) {
-    //printf("Acquiring Lock\n");
-    //printf("Thread %s: Calling thread_resolve_deadlock()\n", thread_current()->name);
-    thread_current()->lockWant = lock;
-    //list_insert_ordered(&lock->semaphore.waiters, &thread_current()->elem, &sort_sema_wait, NULL);
-    thread_resolve_deadlock(lock);
-    //printf("finished thread_resolve_Deadlock\n");
-    //printf("Thread %s: Yielding\n", thread_current()->name);
-    thread_yield();
-    // sema_down_added(&lock->semaphore, 1);  
-    // intr_set_level(old_level);
-  } //else {
-  //   intr_set_level(old_level);
-  //   sema_down (&lock->semaphore);
-  // }
-  intr_set_level(old_level);
-  sema_down(&lock->semaphore);
-
+  // enum intr_level old_level;
   // old_level = intr_disable();
 
-  // struct thread *t = thread_current();
-  // t->lockWant = NULL;
-  //thread_current()->lockWant = lock;
-  lock->holder = thread_current();
-  // if (t->donationsRec != 0) {
-  //   t->donatedPriority -= t->priDonateHistory[--t->donationsRec];
+  // if (lock->holder != NULL) {
+  //   thread_current()->lockWant = lock;
+  //   list_push_back(&lock->holder->donators, &thread_current()->donee);
+  //   //list_insert_ordered(&lock->semaphore.waiters, &thread_current()->elem, &sort_sema_wait, NULL);
+  //   thread_resolve_deadlock(lock);
+  //   //sort ready queue
+  //   thread_yield();
+    
   // }
-  
-  // //thread_current()->donatedPriority = 0;
-  // lock->holder = t;
-  // //lock->holder = thread_current ();
   // intr_set_level(old_level);
+  // sema_down(&lock->semaphore);
+  // lock->holder = thread_current();
+  ASSERT (lock != NULL);
+  ASSERT (!intr_context());
+  ASSERT(!lock_held_by_current_thread(lock));
+
+  sema_down(&lock->semaphore);
+  lock->holder = thread_current();
+
 }
 
 void lock_acquire_safe (struct lock *lock) {
@@ -306,24 +292,42 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   enum intr_level old_level = intr_disable();
 
-  struct thread *t = thread_current();
-  //t->lockWant = NULL;
+  sema_up(&lock->semaphore);
+  thread_current()->donatedPriority = 0;
+  // struct thread *t = thread_current();
 
-  if (t->donationsRec != 0) {
-    //printf("Thread %s: Removing %d priority\n", t->name, t->priDonateHistory[--t->donationsRec]);
-    //printf("Recieved %d donations\n", t->donationsRec);
-    t->donatedPriority -= t->priDonateHistory[--t->donationsRec];
-    newPri_thread_yield();
-  }
-  
-  // //thread_current()->donatedPriority = 0;
-  // lock->holder = t;
-  // //lock->holder = thread_current ();
-  // intr_set_level(old_level);
-  lock->holder = NULL;
+  // if (list_empty(/*&lock->holder->donators*/&thread_current()->donators)) {
+  //   t->donatedPriority = 0;
+  // } else {
+  //   struct list_elem *e;
+  //   for (/*struct list_elem **/e = list_begin(
+  //   /*&lock->holder->donators*/&thread_current()->donators); 
+  //   e!= list_end(/*&lock->holder->donators*/&thread_current()->donators);
+  //    e = list_next(e)) {
+  //     struct thread *remove = list_entry(e, struct thread, donee);
+  //     if (remove->lockWant == lock) {
+  //       list_remove(e);
+  //       remove->lockWant = NULL;
+  //     }
+  //   }
+  // }
+
+  // if (!list_empty(/*&lock->holder->donators*/&thread_current()->donators)) {
+  //   int maxPriority = thread_get_other_priority(list_entry(
+  //       list_max(/*&lock->holder->donators*/ &thread_current()->donators, &sort_sema_wait, NULL),
+  //       struct thread, donee));
+
+  //   thread_donate_priority(
+  //     thread_current(),
+  //     maxPriority - thread_get_priority()
+  //   );
+  // }
+  // newPri_thread_yield();
+
+
   intr_set_level(old_level);
-  sema_up (&lock->semaphore);
 }
+
 
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds

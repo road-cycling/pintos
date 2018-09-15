@@ -393,8 +393,9 @@ void thread_resolve_deadlock(struct lock *l) {
   while (t != NULL) {
     //printf("In While Loop\n");
     thread_donate_priority(t, cur_thread_pri - thread_get_other_priority(t));
-    list_remove(&t->elem);
-    list_push_front(&ready_list, &t->elem);
+    //this is wrong
+    //list_remove(&t->elem);
+    //list_push_front(&ready_list, &t->elem);
 
     if (t->lockWant != NULL && t->lockWant->holder != NULL) {
       t = t->lockWant->holder;
@@ -439,23 +440,8 @@ void thread_set_priority (int new_priority) {
 void thread_donate_priority(struct thread *t, int new_priority) {
 
   ASSERT (intr_get_level() == INTR_OFF);
-  //printf("Donations Recieved: %d\n", t->donationsRec);
-  //ASSERT (t->donationsRec < 8);
-  //printf("Donating priority %d to thread\n", new_priority);
-  //printf("Before: thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
-  //printf("Current Thread Donated Priority is %d\n", t->donatedPriority);
-  //printf("Thread %s: Donating %d priority. Current Priority %d\n", t->name, new_priority, thread_get_other_priority(t));
-  //t->priDonateHistory[t->donationsRec++] = new_priority;
-  t->donatedPriority += new_priority;
-  //t->deadlockResolved = 1;
-  //printf("After:  thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
 
-  //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
-  //list_sort(&ready_list, &sort_priority_queue, NULL);
-  //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
-  // if (thread_get_other_priority(t) > thread_get_priority()) {
-  //   thread_yield();
-  // }
+  t->donatedPriority += new_priority;
 }
 
 /* Returns the current thread's priority. */
@@ -584,11 +570,11 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->donatedPriority = 0;
-  //t->deadlockResolved = -1;
-  list_init(t->donators);
+  //list_init(&t->donators);
   t->lockWant = NULL;
   t->magic = THREAD_MAGIC;
   //t->donationsRec = 0;
+  //list_init(&t->donators);
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -693,7 +679,7 @@ allocate_tid (void)
   static tid_t next_tid = 1;
   tid_t tid;
 
-  lock_acquire (&tid_lock);
+  lock_acquire_safe (&tid_lock);
   tid = next_tid++;
   lock_release (&tid_lock);
 
