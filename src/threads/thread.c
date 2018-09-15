@@ -425,10 +425,13 @@ void thread_set_priority (int new_priority) {
 void thread_donate_priority(struct thread *t, int new_priority) {
 
   ASSERT (intr_get_level() == INTR_OFF);
+  ASSERT (t->donationsRec < 8);
   //printf("Donating priority %d to thread\n", new_priority);
   //printf("Before: thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
   //printf("Current Thread Donated Priority is %d\n", t->donatedPriority);
-  t->donatedPriority = new_priority;
+  printf("Thread %s: Donating %d priority. Current Priority %d\n", t->name, new_priority, thread_get_other_priority(t));
+  t->priDonateHistory[t->donationsRec++] = new_priority;
+  t->donatedPriority += new_priority;
   t->deadlockResolved = 1;
   //printf("After:  thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
 
@@ -569,6 +572,7 @@ init_thread (struct thread *t, const char *name, int priority)
   t->deadlockResolved = -1;
   t->lockWant = NULL;
   t->magic = THREAD_MAGIC;
+  t->donationsRec = 0;
   list_push_back (&all_list, &t->allelem);
 }
 

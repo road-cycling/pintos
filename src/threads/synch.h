@@ -44,7 +44,7 @@ void cond_signal (struct condition *, struct lock *);
 void cond_broadcast (struct condition *, struct lock *);
 
 bool sort_sema_wait(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-
+void lock_acquire_safe (struct lock *lock);
 
 /* Optimization barrier.
 

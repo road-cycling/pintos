@@ -105,16 +105,29 @@ sema_try_down (struct semaphore *sema)
 
    This function may be called from an interrupt handler. */
 void
-sema_up (struct semaphore *sema) 
-{
+sema_up (struct semaphore *sema)  {
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
 
-  old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
-    thread_unblock (list_entry (list_pop_front (&sema->waiters), struct thread, elem));
+  struct thread *highestPriWaiter = NULL;
+  old_level = intr_disable();
+  if (!list_empty (&sema->waiters)) {
+    //be safe
+    list_sort(&sema->waiters, &sort_sema_wait, NULL);
+    highestPriWaiter = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
+    thread_unblock(highestPriWaiter);
+  }
   sema->value++;
+
+  //thread_current()->donatedPriority = 0;
+
+  if (highestPriWaiter != NULL && thread_get_other_priority(highestPriWaiter) > thread_get_priority()) {
+    //printf("Sema Up. In last if statement, yielding\n");
+    thread_yield();
+
+  }
+
   intr_set_level (old_level);
 }
 
@@ -188,40 +201,48 @@ lock_init (struct lock *lock)
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
 void lock_acquire (struct lock *lock) {
+  //printf("Acquiring Lock\n");
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-
+  ASSERT (thread_current()->donationsRec < 8);
   //race condition if we check lock->holder == null without lock /intr off
   enum intr_level old_level;
   old_level = intr_disable();
 
-  // struct thread *c_thread = thread_current();
-  // c_thread->lockWant = lock;
-  // if (lock->holder != NULL) {
-
-  //   //printf("Donating Priority\n");
-  //   //printf("Priority Before %d\n", thread_get_other_priority(lock->holder));
-  //   //thread_donate_priority(lock->holder, thread_get_priority() - thread_get_other_priority(lock->holder));
-  //   //printf("Priority After %d\n", thread_get_other_priority(lock->holder));
-  // }
-  //struct thread *t = lock->holder;
   if (lock->holder != NULL) {
+    printf("Acquiring Lock\n");
+    //printf("Thread %s: Calling thread_resolve_deadlock()\n", thread_current()->name);
     thread_resolve_deadlock(lock);
+    //printf("Thread %s: Yielding\n", thread_current()->name);
     thread_yield();
   };
-  // if (t != NULL) {
-  //   int cur_thread_pri = thread_get_priority();
-  //   while (t != NULL) {
-
-  //   }
-  //   thread_yield();
-  // }
 
   intr_set_level(old_level);
   sema_down (&lock->semaphore);
-  thread_current()->lockWant = NULL;
-  lock->holder = thread_current ();
+
+  // old_level = intr_disable();
+
+  // struct thread *t = thread_current();
+  // t->lockWant = NULL;
+  lock->holder = thread_current();
+  // if (t->donationsRec != 0) {
+  //   t->donatedPriority -= t->priDonateHistory[--t->donationsRec];
+  // }
+  
+  // //thread_current()->donatedPriority = 0;
+  // lock->holder = t;
+  // //lock->holder = thread_current ();
+  // intr_set_level(old_level);
+}
+
+void lock_acquire_safe (struct lock *lock) {
+  ASSERT (lock != NULL);
+  ASSERT (!intr_context());
+  ASSERT(!lock_held_by_current_thread(lock));
+
+  sema_down(&lock->semaphore);
+  lock->holder = thread_current();
 }
 
 /* Tries to acquires LOCK and returns true if successful or false
@@ -255,7 +276,22 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
 
+  enum intr_level old_level = intr_disable();
+
+  struct thread *t = thread_current();
+  t->lockWant = NULL;
+
+  if (t->donationsRec != 0) {
+    printf("Thread %s: Removing %d priority\n", t->name, t->priDonateHistory[--t->donationsRec]);
+    t->donatedPriority -= t->priDonateHistory[t->donationsRec];
+  }
+  
+  // //thread_current()->donatedPriority = 0;
+  // lock->holder = t;
+  // //lock->holder = thread_current ();
+  // intr_set_level(old_level);
   lock->holder = NULL;
+  intr_set_level(old_level);
   sema_up (&lock->semaphore);
 }
 
