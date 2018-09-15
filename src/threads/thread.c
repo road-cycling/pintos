@@ -374,15 +374,25 @@ thread_yield (void)
   intr_set_level (old_level);
 }
 
+void newPri_thread_yield (void) {
+  if (!list_empty(&ready_list)) {
+    struct thread *rqHead = list_entry(list_front(&ready_list), struct thread, elem);
+    if (thread_get_other_priority(rqHead) > thread_get_priority()) {
+      thread_yield();
+    }
+  }
+}
+
 void thread_resolve_deadlock(struct lock *l) {
   ASSERT (intr_get_level() == INTR_OFF);
 
   int cur_thread_pri = thread_get_priority();
   struct thread *t = l->holder;
   while (t != NULL) {
-    thread_donate_priority(t, cur_thread_pri - thread_get_other_priority(t));
-    list_remove(&t->elem);
-    list_push_front(&ready_list, &t->elem);
+    //thread_donate_priority(t, cur_thread_pri - thread_get_other_priority(t));
+    t->donatedPriority += cur_thread_pri - thread_get_other_priority(t);
+    //list_remove(&t->elem);
+    //list_push_front(&ready_list, &t->elem);
 
     if (t->lockWant != NULL && t->lockWant->holder != NULL) {
       t = t->lockWant->holder;
@@ -390,6 +400,8 @@ void thread_resolve_deadlock(struct lock *l) {
       break;
     }
   }
+  //list_sort()
+  list_sort(&ready_list, &sort_priority_queue, NULL);
 }
 
 /* Invoke function 'func' on all threads, passing along 'aux'.
@@ -428,7 +440,7 @@ void thread_donate_priority(struct thread *t, int new_priority) {
 
   ASSERT (intr_get_level() == INTR_OFF);
   
-  t->priDonateHistory[t->donationsRec++] = new_priority;
+  //t->priDonateHistory[t->donationsRec++] = new_priority;
   t->donatedPriority += new_priority;
 
 }
@@ -559,10 +571,9 @@ init_thread (struct thread *t, const char *name, int priority)
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
   t->donatedPriority = 0;
-  t->deadlockResolved = -1;
+  list_init(&t->donators);
   t->lockWant = NULL;
   t->magic = THREAD_MAGIC;
-  t->donationsRec = 0;
   list_push_back (&all_list, &t->allelem);
 }
 

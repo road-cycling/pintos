@@ -123,9 +123,7 @@ sema_up (struct semaphore *sema)  {
   //thread_current()->donatedPriority = 0;
 
   if (highestPriWaiter != NULL && thread_get_other_priority(highestPriWaiter) > thread_get_priority()) {
-    //printf("Sema Up. In last if statement, yielding\n");
     thread_yield();
-
   }
 
   intr_set_level (old_level);
@@ -205,20 +203,21 @@ void lock_acquire (struct lock *lock) {
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (!lock_held_by_current_thread (lock));
-  ASSERT (thread_current()->donationsRec < 8);
+  //ASSERT (thread_current()->donationsRec < 8);
   //race condition if we check lock->holder == null without lock /intr off
   enum intr_level old_level;
   old_level = intr_disable();
 
   if (lock->holder != NULL) {
     thread_current()->lockWant = lock;
+    list_push_back(&lock->holder->donators, &thread_current()->donee);
     thread_resolve_deadlock(lock);
     thread_yield();
   };
 
   intr_set_level(old_level);
   sema_down (&lock->semaphore);
-
+  thread_current()->lockWant = NULL;
   lock->holder = thread_current();
 
 }
@@ -268,15 +267,30 @@ lock_release (struct lock *lock)
   struct thread *t = thread_current();
   t->lockWant = NULL;
 
-  if (t->donationsRec != 0) {
-    //printf("Thread %s: Removing %d priority\n", t->name, t->priDonateHistory[--t->donationsRec]);
-    t->donatedPriority -= t->priDonateHistory[--t->donationsRec];
+  if (list_empty(&t->donators)) {
+    t->donatedPriority = 0;
+  } else {
+    struct list_elem *e;
+    for (e = list_begin(&t->donators); e != list_end(&t->donators); e = list_next(e)) {
+      struct thread *rmv = list_entry(e, struct thread, donee);
+      if (rmv->lockWant == lock) {
+        list_remove(e);
+        rmv->lockWant = NULL;
+      }
+    }
   }
+
+  if (!list_empty(&t->donators)) {
+    int maxPriority = thread_get_other_priority(list_entry(
+      list_max(&t->donators, &sort_sema_wait, NULL), struct thread, donee));
+    //printf("Thread %d: New Donated Priority is %d\n", t->name, maxPriority - thread_get_priority());
+    t->donatedPriority += maxPriority - thread_get_priority();
+
+    newPri_thread_yield();
+  }
+
   
-  // //thread_current()->donatedPriority = 0;
-  // lock->holder = t;
-  // //lock->holder = thread_current ();
-  // intr_set_level(old_level);
+
   lock->holder = NULL;
   intr_set_level(old_level);
   sema_up (&lock->semaphore);
