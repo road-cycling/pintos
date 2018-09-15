@@ -414,33 +414,23 @@ void thread_set_priority (int new_priority) {
   thread_current ()->priority = new_priority;
   thread_current()->donatedPriority = 0;
 
-  list_sort(&ready_list, &sort_priority_queue, NULL);
+  //list_sort(&ready_list, &sort_priority_queue, NULL);
 
-  struct thread *rqHead = list_entry(list_front(&ready_list), struct thread, elem);
-  if (thread_get_other_priority(rqHead) > thread_get_priority()) {
-    thread_yield();
+  if (!list_empty(&ready_list)) {
+    struct thread *rqHead = list_entry(list_front(&ready_list), struct thread, elem);
+    if (thread_get_other_priority(rqHead) > thread_get_priority()) {
+      thread_yield();
+    }
   }
 }
 
 void thread_donate_priority(struct thread *t, int new_priority) {
 
   ASSERT (intr_get_level() == INTR_OFF);
-  ASSERT (t->donationsRec < 8);
-  //printf("Donating priority %d to thread\n", new_priority);
-  //printf("Before: thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
-  //printf("Current Thread Donated Priority is %d\n", t->donatedPriority);
-  printf("Thread %s: Donating %d priority. Current Priority %d\n", t->name, new_priority, thread_get_other_priority(t));
+  
   t->priDonateHistory[t->donationsRec++] = new_priority;
   t->donatedPriority += new_priority;
-  t->deadlockResolved = 1;
-  //printf("After:  thread_donate_priority *t->allPriority=%d\n", thread_get_other_priority(t));
 
-  //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
-  //list_sort(&ready_list, &sort_priority_queue, NULL);
-  //printf("Donated Threads Priority %d \t Current Thread Priority %d \n", thread_get_other_priority(t), thread_get_priority());
-  // if (thread_get_other_priority(t) > thread_get_priority()) {
-  //   thread_yield();
-  // }
 }
 
 /* Returns the current thread's priority. */

@@ -211,29 +211,16 @@ void lock_acquire (struct lock *lock) {
   old_level = intr_disable();
 
   if (lock->holder != NULL) {
-    printf("Acquiring Lock\n");
-    //printf("Thread %s: Calling thread_resolve_deadlock()\n", thread_current()->name);
+    thread_current()->lockWant = lock;
     thread_resolve_deadlock(lock);
-    //printf("Thread %s: Yielding\n", thread_current()->name);
     thread_yield();
   };
 
   intr_set_level(old_level);
   sema_down (&lock->semaphore);
 
-  // old_level = intr_disable();
-
-  // struct thread *t = thread_current();
-  // t->lockWant = NULL;
   lock->holder = thread_current();
-  // if (t->donationsRec != 0) {
-  //   t->donatedPriority -= t->priDonateHistory[--t->donationsRec];
-  // }
-  
-  // //thread_current()->donatedPriority = 0;
-  // lock->holder = t;
-  // //lock->holder = thread_current ();
-  // intr_set_level(old_level);
+
 }
 
 void lock_acquire_safe (struct lock *lock) {
@@ -282,8 +269,8 @@ lock_release (struct lock *lock)
   t->lockWant = NULL;
 
   if (t->donationsRec != 0) {
-    printf("Thread %s: Removing %d priority\n", t->name, t->priDonateHistory[--t->donationsRec]);
-    t->donatedPriority -= t->priDonateHistory[t->donationsRec];
+    //printf("Thread %s: Removing %d priority\n", t->name, t->priDonateHistory[--t->donationsRec]);
+    t->donatedPriority -= t->priDonateHistory[--t->donationsRec];
   }
   
   // //thread_current()->donatedPriority = 0;
