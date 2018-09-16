@@ -289,7 +289,13 @@ lock_release (struct lock *lock)
     //printf("Thread %d: New Donated Priority is %d\n", t->name, maxPriority - thread_get_priority());
     t->donatedPriority += maxPriority - thread_get_priority();
   } else {
-    t->donatedPriority = 0;
+    if (t->resetPriority != 0) {
+      t->priority = t->resetPriority;
+      t->resetPriority = 0;
+      t->donatedPriority = 0;
+    } else {
+      t->donatedPriority = 0;
+    }
   }
 
   lock->holder = NULL;

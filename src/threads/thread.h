@@ -96,6 +96,7 @@ struct thread
     int64_t wakeUpTime;
 
     int donatedPriority;
+    int resetPriority;
     struct list_elem donee;
     struct list donators;
     struct lock *lockWant;
