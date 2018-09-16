@@ -67,6 +67,8 @@ sema_down (struct semaphore *sema)
 
   old_level = intr_disable ();
   while (sema->value == 0)  {
+    //thread low pri32 block here
+    //thread med pri45 block here
       list_insert_ordered(&sema->waiters, &thread_current ()->elem, &sort_sema_wait, NULL);
       thread_block ();
   }
@@ -115,18 +117,25 @@ sema_up (struct semaphore *sema)  {
   if (!list_empty (&sema->waiters)) {
     //be safe
     list_sort(&sema->waiters, &sort_sema_wait, NULL);
+    //struct list_elem *max = list_max(&sema->waiters, &sort_sema_wait, NULL);
+    //highestPriWaiter = list_entry(max, struct thread, elem);
+  
+    //list_remove(max);
     highestPriWaiter = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
+    //printf("Waking up Thread Priority %d\n", thread_get_other_priority(highestPriWaiter));
+    //printf("foo\n");
     thread_unblock(highestPriWaiter);
   }
   sema->value++;
-
+  intr_set_level (old_level);
   //thread_current()->donatedPriority = 0;
 
   if (highestPriWaiter != NULL && thread_get_other_priority(highestPriWaiter) > thread_get_priority()) {
+    //main thread yield
     thread_yield();
   }
 
-  intr_set_level (old_level);
+ 
 }
 
 static void sema_test_helper (void *sema_);
@@ -275,10 +284,22 @@ lock_release (struct lock *lock)
       struct thread *rmv = list_entry(e, struct thread, donee);
       if (rmv->lockWant == lock) {
         list_remove(e);
-        rmv->lockWant = NULL;
       }
     }
   }
+
+  // if (!list_empty(&t->donators)) {
+  //   int maxPriority = thread_get_other_priority(list_entry(
+  //     list_max(&t->donators, &sort_sema_wait, NULL), struct thread, donee));
+  //   //printf("Thread %d: New Donated Priority is %d\n", t->name, maxPriority - thread_get_priority());
+  //   t->donatedPriority += maxPriority - thread_get_priority();
+
+  //   newPri_thread_yield();
+  // } 
+
+  lock->holder = NULL;
+  intr_set_level(old_level);
+  sema_up (&lock->semaphore);
 
   if (!list_empty(&t->donators)) {
     int maxPriority = thread_get_other_priority(list_entry(
@@ -289,11 +310,6 @@ lock_release (struct lock *lock)
     newPri_thread_yield();
   }
 
-  
-
-  lock->holder = NULL;
-  intr_set_level(old_level);
-  sema_up (&lock->semaphore);
 }
 
 /* Returns true if the current thread holds LOCK, false
