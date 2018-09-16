@@ -88,11 +88,6 @@ timer_elapsed (int64_t then)
    be turned on. */
 void
 timer_sleep (int64_t ticks)  {
-  //int64_t start = timer_ticks ();
-
-  //ASSERT (intr_get_level () == INTR_ON);
-  //while (timer_elapsed (start) < ticks) 
-  //  thread_yield ();
 
   enum intr_level old_level;
   old_level = intr_disable();

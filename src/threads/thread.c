@@ -258,7 +258,6 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  //list_push_back (&ready_list, &t->elem);
   list_insert_ordered(&ready_list, &t->elem, &sort_priority_queue, NULL);
   t->status = THREAD_READY;
   intr_set_level (old_level);
@@ -389,24 +388,14 @@ void thread_resolve_deadlock(struct lock *l) {
   int cur_thread_pri = thread_get_priority();
   struct thread *t = l->holder;
   while (t != NULL) {
-    //thread_donate_priority(t, cur_thread_pri - thread_get_other_priority(t));
     t->donatedPriority += cur_thread_pri - thread_get_other_priority(t);
-
-    //printf("In While Loop\n");
-    //thread_donate_priority(t, cur_thread_pri - thread_get_other_priority(t));
-    //this is wrong
-
-    //list_remove(&t->elem);
-    //list_push_front(&ready_list, &t->elem);
 
     if (t->lockWant != NULL && t->lockWant->holder != NULL) {
       t = t->lockWant->holder;
     } else {
-      //printf("Breaking \n");
       break;
     }
   }
-  //list_sort()
   list_sort(&ready_list, &sort_priority_queue, NULL);
 }
 
@@ -430,9 +419,7 @@ thread_foreach (thread_action_func *func, void *aux)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority (int new_priority) {
   thread_current ()->priority = new_priority;
-  //thread_current()->donatedPriority = 0;
 
-  //list_sort(&ready_list, &sort_priority_queue, NULL);
   if (!list_empty(&ready_list)) {
     struct thread *rqHead = list_entry(list_front(&ready_list), struct thread, elem);
     if (thread_get_other_priority(rqHead) > thread_get_priority()) {
@@ -445,9 +432,7 @@ void thread_donate_priority(struct thread *t, int new_priority) {
 
   ASSERT (intr_get_level() == INTR_OFF);
 
-  
-  //t->priDonateHistory[t->donationsRec++] = new_priority;
-  t->donatedPriority += new_priority;
+    t->donatedPriority += new_priority;
 }
 
 /* Returns the current thread's priority. */
