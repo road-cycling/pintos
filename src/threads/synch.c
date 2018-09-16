@@ -130,10 +130,12 @@ sema_up (struct semaphore *sema)  {
   intr_set_level (old_level);
   //thread_current()->donatedPriority = 0;
 
-  if (highestPriWaiter != NULL && thread_get_other_priority(highestPriWaiter) > thread_get_priority()) {
-    //main thread yield
-    thread_yield();
-  }
+  thread_yield();
+//yield?lo
+  // if (highestPriWaiter != NULL && thread_get_other_priority(highestPriWaiter) > thread_get_priority()) {
+  //   //main thread yield
+  //   thread_yield();
+  // }
 
  
 }
@@ -297,9 +299,9 @@ lock_release (struct lock *lock)
   //   newPri_thread_yield();
   // } 
 
-  lock->holder = NULL;
-  intr_set_level(old_level);
-  sema_up (&lock->semaphore);
+  // lock->holder = NULL;
+  // intr_set_level(old_level);
+  // sema_up (&lock->semaphore);
 
   if (!list_empty(&t->donators)) {
     int maxPriority = thread_get_other_priority(list_entry(
@@ -307,8 +309,15 @@ lock_release (struct lock *lock)
     //printf("Thread %d: New Donated Priority is %d\n", t->name, maxPriority - thread_get_priority());
     t->donatedPriority += maxPriority - thread_get_priority();
 
-    newPri_thread_yield();
+    //newPri_thread_yield();
+  } else {
+    t->donatedPriority = 0;
   }
+
+  lock->holder = NULL;
+  intr_set_level(old_level);
+  sema_up (&lock->semaphore);
+
 
 }
 
