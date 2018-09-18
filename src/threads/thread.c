@@ -11,9 +11,17 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/fixedpoint.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
+
+/*
+Fixed Point Calculations
+  int recentCPU = (2 * FPtoInt(32768)) / (2 * FPtoInt(32768) + 1) * recentCPU + nice;
+  int priority = PRI_MAX - (FPtoIntRN(12288) / 4) - (nice * 2);
+  int loadAVG = mulFPFP((IntToFP(59) / 60), loadAVG) + mulFPInt((IntToFP(1) / 60), ready_threads);
+  */
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -41,6 +49,11 @@ static struct lock tid_lock;
 
 /* Next Wake Up Time */
 static int nextWakeUpTime = -1;
+
+//loadAvg must be updated exactly when the system
+//tick counter reaches a multiple of a second
+//when timer_ticks % TIMER_FREQ = 0
+static int loadAvg = 0;
 
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
@@ -151,6 +164,32 @@ thread_print_stats (void)
 {
   printf ("Thread: %lld idle ticks, %lld kernel ticks, %lld user ticks\n",
           idle_ticks, kernel_ticks, user_ticks);
+}
+
+void thread_calc_loadAvg(void) {
+  loadAvg = mulFPFP((IntToFP(59) / 60), loadAvg) + \
+            mulFPInt((IntToFP(1) / 60), thread_get_read_thread_count());
+}
+
+int thread_get_read_thread_count(void) {
+  //not including idle thread
+  return list_size(&ready_list) - 1;
+}
+
+void all_thread_calc_recent_cpu(void) {
+  thread_foreach(&thread_calc_recent_cpu, NULL);
+}
+
+void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED) {
+  t->recent_cpu = (2 * FPtoInt(loadAvg)) / (2 * FPtoInt(loadAvg) + 1) * t->recent_cpu + t->nice;
+}
+void all_thread_calc_priority(void) {
+  thread_foreach(&thread_calc_priority, NULL);
+}
+
+
+void thread_calc_priority(struct thread *t, void *aux UNUSED) {
+  t->priority = PRI_MAX - (FPtoIntRN(t->recent_cpu) / 4) - (t->nice * 2);
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -473,11 +512,10 @@ thread_get_nice (void)
 }
 
 /* Returns 100 times the system load average. */
-int
-thread_get_load_avg (void) 
-{
+int thread_get_load_avg (void) {
   /* Not yet implemented. */
-  return 0;
+  return FPtoIntRN(loadAvg * 100);
+  //return 0;
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */

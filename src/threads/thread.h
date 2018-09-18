@@ -101,6 +101,11 @@ struct thread
     struct list donators;
     struct lock *lockWant;
 
+    int nice;
+    //each time a timer interrupt occurs we increment recent_cpu by one
+    //running thread only
+    int recent_cpu;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -120,6 +125,13 @@ void thread_start (void);
 
 void thread_tick (void);
 void thread_print_stats (void);
+
+void thread_calc_loadAvg(void);
+int thread_get_read_thread_count(void);
+void all_thread_calc_recent_cpu(void);
+void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED);
+void all_thread_calc_priority(void);
+void thread_calc_priority(struct thread *t, void *aux UNUSED);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);

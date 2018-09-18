@@ -167,9 +167,35 @@ timer_print_stats (void)
 }
 
 /* Timer interrupt handler. */
-static void
-timer_interrupt (struct intr_frame *args UNUSED) {
+static void timer_interrupt (struct intr_frame *args UNUSED) {
+  /* Assumptions made by some of the tests require that these recalculations of
+  recent_cpu be made exactly when the system tick counter reaches a multiple of
+  a second, when timer_ticks() % TIMER_FREQ == 0 // for recent CPU
+  loadAvg calc "exactly" once per second 
+  from doc: System timer that ticks, by default, 100 times per second
+  */
   ticks++;
+  if (thread_mlfqs) {
+    enum intr_level old_level;
+    old_level = intr_disable();
+    struct thread *curr = thread_current();
+
+    curr->recent_cpu += 1;
+
+    if (ticks % TIMER_FREQ == 0) {
+      //calculate recent cpu
+      all_thread_calc_recent_cpu();
+
+      //calc loadAVG
+      thread_calc_loadAvg();
+    }
+
+    if (ticks % 4 == 0) {
+      all_thread_calc_priority();
+    }
+
+    intr_set_level(old_level);
+  }
   on_timer_interrupt(ticks);
   thread_tick ();
 }
