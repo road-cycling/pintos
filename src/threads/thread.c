@@ -168,12 +168,26 @@ thread_print_stats (void)
 
 void thread_calc_loadAvg(void) {
   loadAvg = mulFPFP((IntToFP(59) / 60), loadAvg) + \
-            mulFPInt((IntToFP(1) / 60), thread_get_read_thread_count());
+            mulFPInt((IntToFP(1) / 60), thread_get_ready_thread_count());
+  //printf("Ready Threads %d\n", thread_get_ready_thread_count());
+  //printf("loadAvg is %d\n", loadAvg);
 }
 
-int thread_get_read_thread_count(void) {
+int thread_get_ready_thread_count(void) {
   //not including idle thread
-  return list_size(&ready_list) - 1;
+  //idle thread has its own struct
+  //return list_size(&ready_list) - 1;
+  enum intr_level old_level;
+  old_level = intr_disable();
+  int thread_count = 0;
+  if (thread_current() != idle_thread) {
+    //list of wait threads + current thread (not idle)
+    thread_count = list_size(&ready_list) + 1;
+  } else {
+    thread_count = 0;
+  }
+  intr_set_level(old_level);
+  return thread_count;
 }
 
 void all_thread_calc_recent_cpu(void) {

@@ -127,7 +127,7 @@ void thread_tick (void);
 void thread_print_stats (void);
 
 void thread_calc_loadAvg(void);
-int thread_get_read_thread_count(void);
+int thread_get_ready_thread_count(void);
 void all_thread_calc_recent_cpu(void);
 void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED);
 void all_thread_calc_priority(void);
