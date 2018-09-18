@@ -189,7 +189,12 @@ void all_thread_calc_priority(void) {
 
 
 void thread_calc_priority(struct thread *t, void *aux UNUSED) {
+  // Called from multiple functions
+  // need to ensure interrupts are off
+  enum intr_level old_level;
+  old_level = intr_disable();
   t->priority = PRI_MAX - (FPtoIntRN(t->recent_cpu) / 4) - (t->nice * 2);
+  intr_set_level(old_level);
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -414,6 +419,7 @@ thread_yield (void)
 
 void newPri_thread_yield (void) {
   if (!list_empty(&ready_list)) {
+    list_sort(&ready_list, &sort_priority_queue, NULL);
     struct thread *rqHead = list_entry(list_front(&ready_list), struct thread, elem);
     if (thread_get_other_priority(rqHead) > thread_get_priority()) {
       thread_yield();
@@ -497,18 +503,21 @@ int thread_get_other_priority (struct thread *t) {
 
 
 /* Sets the current thread's nice value to NICE. */
-void
-thread_set_nice (int nice UNUSED) 
-{
+void thread_set_nice (int nice) {
   /* Not yet implemented. */
+  /* Sets the current thread's nice value to new_nice and recalculates the thread's
+  priority based on the new value. If the running thread no longer has the highest
+  priority, yields. */
+  thread_current()->nice = nice;
+  thread_calc_priority(thread_current(), NULL);
+  newPri_thread_yield();
 }
 
 /* Returns the current thread's nice value. */
-int
-thread_get_nice (void) 
-{
+int thread_get_nice (void) {
   /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
+  //return 0;
 }
 
 /* Returns 100 times the system load average. */
