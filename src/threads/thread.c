@@ -195,7 +195,10 @@ void all_thread_calc_recent_cpu(void) {
 }
 
 void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED) {
-  t->recent_cpu = (2 * FPtoInt(loadAvg)) / (2 * FPtoInt(loadAvg) + 1) * t->recent_cpu + t->nice;
+  //printf("Recent cpu is %d\n", t->recent_cpu);
+  //t->recent_cpu = (2 * FPtoInt(loadAvg)) / (2 * FPtoInt(loadAvg) + 1) * t->recent_cpu + t->nice;
+  //t->recent_cpu = (mulFPFP(IntToFP(2), loadAvg)) / (mul)
+  t->recent_cpu = (mulFPInt(loadAvg, 2)) / addFPInt(mulFPInt(loadAvg, 2), 1) * t->recent_cpu + t->nice;
 }
 void all_thread_calc_priority(void) {
   thread_foreach(&thread_calc_priority, NULL);
@@ -542,11 +545,13 @@ int thread_get_load_avg (void) {
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
-int
-thread_get_recent_cpu (void) 
-{
+int thread_get_recent_cpu (void) {
+  //printf("Recent CPU is %d\n", thread_current()->recent_cpu);
+  //return 100;
+  //return FPtoIntRN(thread_current()->recent_cpu * 500);
+  return FPtoIntRN(thread_current()->recent_cpu * 100);
   /* Not yet implemented. */
-  return 0;
+  //return 0;
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -663,7 +668,10 @@ static struct thread *next_thread_to_run (void) {
   if (list_empty (&ready_list))
     return idle_thread;
   else
+    //return list_entry(list_max(&ready_list, &sort_priority_queue, NULL), struct thread, elem);
     return list_entry (list_pop_front (&ready_list), struct thread, elem);
+
+  //list_max(&t->donators, &sort_sema_wait, NULL), struct thread, donee));
 }
 
 /* Completes a thread switch by activating the new thread's page
