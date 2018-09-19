@@ -7,6 +7,7 @@
 #include "threads/interrupt.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
+#include "threads/fixedpoint.h"
   
 /* See [8254] for hardware details of the 8254 timer chip. */
 
@@ -167,11 +168,44 @@ timer_print_stats (void)
 }
 
 /* Timer interrupt handler. */
-static void
-timer_interrupt (struct intr_frame *args UNUSED) {
+static void timer_interrupt (struct intr_frame *args UNUSED) {
+  /* Assumptions made by some of the tests require that these recalculations of
+  recent_cpu be made exactly when the system tick counter reaches a multiple of
+  a second, when timer_ticks() % TIMER_FREQ == 0 // for recent CPU
+  loadAvg calc "exactly" once per second 
+  from doc: System timer that ticks, by default, 100 times per second
+  */
+  //bool yield = false;
   ticks++;
+  if (thread_mlfqs) {
+    enum intr_level old_level;
+    old_level = intr_disable();
+    struct thread *curr = thread_current();
+
+    //recent cpu is incremented by 1 for the running thread only,
+    // unless the idle thread is running.
+    if (curr != thread_idle())
+      curr->recent_cpu += IntToFP(1);
+
+    if (ticks % TIMER_FREQ == 0) {
+      //calculate recent cpu
+      all_thread_calc_recent_cpu();
+
+      //calc loadAVG
+      thread_calc_loadAvg();
+    }
+
+    if (ticks % 4 == 0) {
+      all_thread_calc_priority();
+    }
+
+    // if (getMaxPriority() > curr->priority)
+    //   yield = true;
+
+    intr_set_level(old_level);
+  }
   on_timer_interrupt(ticks);
-  thread_tick ();
+  thread_tick (/*yield*/);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

@@ -80,8 +80,7 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-struct thread
-  {
+struct thread {
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
@@ -101,6 +100,11 @@ struct thread
     struct list donators;
     struct lock *lockWant;
 
+    int nice;
+    //each time a timer interrupt occurs we increment recent_cpu by one
+    //running thread only
+    int recent_cpu;
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -118,8 +122,16 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+void thread_tick (/*bool yield*/void);
 void thread_print_stats (void);
+
+void thread_calc_loadAvg(void);
+int thread_get_ready_thread_count(void);
+void all_thread_calc_recent_cpu(void);
+void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED);
+void all_thread_calc_priority(void);
+void thread_calc_priority(struct thread *t, void *aux UNUSED);
+int getMaxPriority(void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
@@ -130,6 +142,7 @@ void thread_sleep(int64_t ticks);
 void on_timer_interrupt(int64_t accum_ticks);
 
 struct thread *thread_current (void);
+struct thread *thread_idle(void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
