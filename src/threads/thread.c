@@ -139,7 +139,7 @@ thread_start (void)
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) 
+thread_tick (/*bool yield*/ void) 
 {
   struct thread *t = thread_current ();
 
@@ -154,7 +154,7 @@ thread_tick (void)
     kernel_ticks++;
 
   /* Enforce preemption. */
-  if (++thread_ticks >= TIME_SLICE)
+  if (++thread_ticks >= TIME_SLICE/* || yield*/)
     intr_yield_on_return ();
 }
 
@@ -195,32 +195,11 @@ void all_thread_calc_recent_cpu(void) {
 }
 
 void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED) {
-  //printf("Recent cpu is %d\n", t->recent_cpu);
-  //t->recent_cpu = (2 * FPtoInt(loadAvg)) / (2 * FPtoInt(loadAvg) + 1) 
-   //* t->recent_cpu + IntToFP(t->nice);
-  t->recent_cpu = divFPFP((loadAvg * 2), mulFPFP((loadAvg * 2 + IntToFP(1)), t->recent_cpu)) + IntToFP(t->nice);
-  //t->recent_cpu = (mulFPFP(IntToFP(2), loadAvg)) / (mul)
-  //printf("%d\n", t->recent_cpu);
-  //t->recent_cpu = mulFPFP(divFPFP(2 * loadAvg, 2 * loadAvg + IntToFP(1)),t->recent_cpu) + IntToFP(t->nice);
-  //t->recent_cpu = (2 * loadAvg) / (2 * loadAvg + IntToFP(1)) * t->recent_cpu + IntToFP(t->nice);
-  //t->recent_cpu = divFPFP(
-  //    mulFPInt(loadAvg, 2), 
-  //    mulFPFP(addFPInt(mulFPInt(loadAvg, 2), 1), t->recent_cpu)) + IntToFP(t->nice);
 
-  //mulFPInt(loadAvg, 2) mulFPInt(loadAvg, 2)
-  // recent_cpu = (2 * loadAvg) / (2 * loadAvg + 1) * t->recent_cpu + t->nice
-  // int num = mulFPInt(loadAvg, 2);
-  // int denom = addFPInt(num, 1);
-  // int mul = mulFPFP(denom, t->recent_cpu);
-  // int closer = divFPFP(num, mul);
-  // int answer = addFPInt(closer, t->nice);
-  // t->recent_cpu = answer;
-  //t->recent_cpu = divFPFP((loadAvg * 2), mulFPFP((loadAvg * 2 + IntToFP(1)), IntToFP(t->recent_cpu))) + IntToFP(t->nice);
-  //int fp = divFPFP((2 * loadAvg), addFPInt((2 * loadAvg), 1));
-  //int s = mulFPFP(fp, t->recent_cpu) + FPtoInt(t->nice);
-  //t->recent_cpu = s;
-
+  t->recent_cpu = divFPFP((loadAvg * 2), mulFPFP((loadAvg * 2 + IntToFP(1)), t->recent_cpu)) + \
+   IntToFP(t->nice);
 }
+
 void all_thread_calc_priority(void) {
   thread_foreach(&thread_calc_priority, NULL);
 }
@@ -231,8 +210,15 @@ void thread_calc_priority(struct thread *t, void *aux UNUSED) {
   // need to ensure interrupts are off
   enum intr_level old_level;
   old_level = intr_disable();
+  //t->priority = PRI_MAX - (FPtoIntRN(t->recent_cpu) / 4) - (t->nice * 2);
   t->priority = PRI_MAX - (FPtoIntRN(t->recent_cpu) / 4) - (t->nice * 2);
   intr_set_level(old_level);
+}
+
+int getMaxPriority() {
+  if (!list_empty(&ready_list))
+    return list_entry(list_max(&ready_list, &sort_priority_queue, NULL), struct thread, elem)->priority;
+  return 0;
 }
 
 /* Creates a new kernel thread named NAME with the given initial
@@ -546,6 +532,8 @@ int thread_get_other_priority (struct thread *t) {
 
 /* Sets the current thread's nice value to NICE. */
 void thread_set_nice (int nice) {
+
+  ASSERT (nice >= -20 && nice <= 20);
   /* Not yet implemented. */
   /* Sets the current thread's nice value to new_nice and recalculates the thread's
   priority based on the new value. If the running thread no longer has the highest

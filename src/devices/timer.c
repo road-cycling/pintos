@@ -175,6 +175,7 @@ static void timer_interrupt (struct intr_frame *args UNUSED) {
   loadAvg calc "exactly" once per second 
   from doc: System timer that ticks, by default, 100 times per second
   */
+  //bool yield = false;
   ticks++;
   if (thread_mlfqs) {
     enum intr_level old_level;
@@ -198,10 +199,13 @@ static void timer_interrupt (struct intr_frame *args UNUSED) {
       all_thread_calc_priority();
     }
 
+    // if (getMaxPriority() > curr->priority)
+    //   yield = true;
+
     intr_set_level(old_level);
   }
   on_timer_interrupt(ticks);
-  thread_tick ();
+  thread_tick (/*yield*/);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

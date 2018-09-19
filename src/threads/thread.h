@@ -122,7 +122,7 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+void thread_tick (/*bool yield*/void);
 void thread_print_stats (void);
 
 void thread_calc_loadAvg(void);
@@ -131,6 +131,7 @@ void all_thread_calc_recent_cpu(void);
 void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED);
 void all_thread_calc_priority(void);
 void thread_calc_priority(struct thread *t, void *aux UNUSED);
+int getMaxPriority(void);
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
