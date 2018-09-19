@@ -285,7 +285,7 @@ lock_release (struct lock *lock)
   if (!thread_mlfqs) {
     if (!list_empty(&t->donators)) {
       int maxPriority = thread_get_other_priority(list_entry(
-        list_max(&t->donators, &sort_sema_wait, NULL), struct thread, donee));
+        list_max(&t->donators, &sort_sema_wait, NULL), struct thread, donee));//lock
       //Leave this printf (learning)
       //printf("Thread %d: New Donated Priority is %d\n", t->name, maxPriority - thread_get_priority());
       t->donatedPriority += maxPriority - thread_get_priority();

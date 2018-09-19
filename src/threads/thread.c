@@ -196,9 +196,30 @@ void all_thread_calc_recent_cpu(void) {
 
 void thread_calc_recent_cpu(struct thread *t, void *aux UNUSED) {
   //printf("Recent cpu is %d\n", t->recent_cpu);
-  //t->recent_cpu = (2 * FPtoInt(loadAvg)) / (2 * FPtoInt(loadAvg) + 1) * t->recent_cpu + t->nice;
+  //t->recent_cpu = (2 * FPtoInt(loadAvg)) / (2 * FPtoInt(loadAvg) + 1) 
+   //* t->recent_cpu + IntToFP(t->nice);
+  t->recent_cpu = divFPFP((loadAvg * 2), mulFPFP((loadAvg * 2 + IntToFP(1)), t->recent_cpu)) + IntToFP(t->nice);
   //t->recent_cpu = (mulFPFP(IntToFP(2), loadAvg)) / (mul)
-  t->recent_cpu = (mulFPInt(loadAvg, 2)) / addFPInt(mulFPInt(loadAvg, 2), 1) * t->recent_cpu + t->nice;
+  //printf("%d\n", t->recent_cpu);
+  //t->recent_cpu = mulFPFP(divFPFP(2 * loadAvg, 2 * loadAvg + IntToFP(1)),t->recent_cpu) + IntToFP(t->nice);
+  //t->recent_cpu = (2 * loadAvg) / (2 * loadAvg + IntToFP(1)) * t->recent_cpu + IntToFP(t->nice);
+  //t->recent_cpu = divFPFP(
+  //    mulFPInt(loadAvg, 2), 
+  //    mulFPFP(addFPInt(mulFPInt(loadAvg, 2), 1), t->recent_cpu)) + IntToFP(t->nice);
+
+  //mulFPInt(loadAvg, 2) mulFPInt(loadAvg, 2)
+  // recent_cpu = (2 * loadAvg) / (2 * loadAvg + 1) * t->recent_cpu + t->nice
+  // int num = mulFPInt(loadAvg, 2);
+  // int denom = addFPInt(num, 1);
+  // int mul = mulFPFP(denom, t->recent_cpu);
+  // int closer = divFPFP(num, mul);
+  // int answer = addFPInt(closer, t->nice);
+  // t->recent_cpu = answer;
+  //t->recent_cpu = divFPFP((loadAvg * 2), mulFPFP((loadAvg * 2 + IntToFP(1)), IntToFP(t->recent_cpu))) + IntToFP(t->nice);
+  //int fp = divFPFP((2 * loadAvg), addFPInt((2 * loadAvg), 1));
+  //int s = mulFPFP(fp, t->recent_cpu) + FPtoInt(t->nice);
+  //t->recent_cpu = s;
+
 }
 void all_thread_calc_priority(void) {
   thread_foreach(&thread_calc_priority, NULL);
@@ -386,6 +407,10 @@ thread_current (void)
   return t;
 }
 
+struct thread *thread_idle(void) {
+  return idle_thread;
+}
+
 /* Returns the running thread's tid. */
 tid_t
 thread_tid (void) 
@@ -548,8 +573,12 @@ int thread_get_load_avg (void) {
 int thread_get_recent_cpu (void) {
   //printf("Recent CPU is %d\n", thread_current()->recent_cpu);
   //return 100;
-  //return FPtoIntRN(thread_current()->recent_cpu * 500);
   return FPtoIntRN(thread_current()->recent_cpu * 100);
+  //return thread_current()->recent_cpu;
+  //return FPtoIntRN(/*thread_current()->recent_cpu * 100*/ 50);
+  //return thread_current()->recent_cpu * 1000;
+  //return FPtoIntRN(thread_current()->recent_cpu * 100);
+  //return thread_current()->recent_cpu;
   /* Not yet implemented. */
   //return 0;
 }
@@ -641,6 +670,8 @@ init_thread (struct thread *t, const char *name, int priority)
   t->donatedPriority = 0;
   t->resetPriority = 0;
   list_init(&t->donators);
+  t->recent_cpu = 0;
+  t->nice = 0;
   t->lockWant = NULL;
   t->magic = THREAD_MAGIC;
   list_push_back (&all_list, &t->allelem);

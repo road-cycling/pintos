@@ -80,8 +80,7 @@ typedef int tid_t;
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-struct thread
-  {
+struct thread {
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
@@ -142,6 +141,7 @@ void thread_sleep(int64_t ticks);
 void on_timer_interrupt(int64_t accum_ticks);
 
 struct thread *thread_current (void);
+struct thread *thread_idle(void);
 tid_t thread_tid (void);
 const char *thread_name (void);
 
