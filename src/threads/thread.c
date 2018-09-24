@@ -111,10 +111,10 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
   list_init (&sleep_queue);
-
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
+
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
 }
@@ -441,8 +441,10 @@ thread_yield (void)
     list_insert_ordered(&ready_list, &cur->elem, &sort_priority_queue, NULL);
   }
   cur->status = THREAD_READY;
+  //printf("Calling schedule\n");
   schedule ();
   intr_set_level (old_level);
+  //printf("Finished\n");
 }
 
 void newPri_thread_yield (void) {
@@ -768,11 +770,13 @@ allocate_tid (void)
 {
   static tid_t next_tid = 1;
   tid_t tid;
-
-  lock_acquire_safe (&tid_lock);
+  //printf("in allocate_tid\n");
+  //lock_acquire_safe (&tid_lock);
+  lock_acquire(&tid_lock);
+  //printf("Got lock\n");
   tid = next_tid++;
   lock_release (&tid_lock);
-
+  //printf("Released lock\n");
   return tid;
 }
 
