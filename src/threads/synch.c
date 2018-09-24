@@ -122,18 +122,21 @@ sema_up (struct semaphore *sema)  {
   enum intr_level old_level;
 
   ASSERT (sema != NULL);
-
   struct thread *highestPriWaiter = NULL;
   old_level = intr_disable();
+  bool wokenUp = false;
   if (!list_empty (&sema->waiters)) {
+    wokenUp = true;
     list_sort(&sema->waiters, &sort_sema_wait, NULL);
     highestPriWaiter = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
     thread_unblock(highestPriWaiter);
   }
   sema->value++;
   intr_set_level (old_level);
-
-  thread_yield();
+  if (wokenUp) {
+    //printf("yielding\n");
+    thread_yield();
+  }
 }
 
 static void sema_test_helper (void *sema_);
@@ -269,7 +272,6 @@ lock_release (struct lock *lock)
   enum intr_level old_level = intr_disable();
 
   struct thread *t = thread_current();
-
   if (list_empty(&t->donators)) {
     t->donatedPriority = 0;
   } else {
