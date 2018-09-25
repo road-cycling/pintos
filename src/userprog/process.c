@@ -202,9 +202,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Returns true if successful, false otherwise. */
 bool
 load (const char *file_name, void (**eip) (void), void **esp) {
-  //hex_dump(0, file_name, sizeof(file_name), NULL);
-  //printf("Load is called\n");
-  printf("File name is %s\n", file_name);
+
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -217,6 +215,10 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
+
+  //Attempting to pass arguments to a program
+  //will include those arguments in the name of
+  //the program, which will probably fail
 
   char *token, *save_ptr;
   char *file_n = malloc(strlen(file_name) + 1);
@@ -316,6 +318,7 @@ load (const char *file_name, void (**eip) (void), void **esp) {
 
  done:
   /* We arrive here whether the load is successful or not. */
+  //printf("In done\n");
   file_close (file);
   free(file_n);
   return success;
@@ -387,7 +390,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
               uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
-  printf("Loading segment\n");
+  //printf("Loading segment\n");
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
@@ -431,9 +434,8 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool
-setup_stack (void **esp, char *file_name) {
-  printf("Setting up stack\n");
+static bool setup_stack (void **esp, char *file_name) {
+  //printf("Setting up stack\n");
 
   uint8_t *kpage;
   bool success = false;
@@ -443,8 +445,8 @@ setup_stack (void **esp, char *file_name) {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
         *esp = PHYS_BASE;
-        printf("PHYS_BASE is %d\n", PHYS_BASE);
-        //*esp = PHYS_BASE - 12;
+        //printf("PHYS_BASE is %d\n", PHYS_BASE);
+       // *esp = PHYS_BASE - 12;
       }
       else {
         palloc_free_page (kpage);
@@ -452,17 +454,23 @@ setup_stack (void **esp, char *file_name) {
     }
 
 
+  //max 10 args 
   char *argv[10];
   char *token, *save_ptr;
   int argc = 0;
-  printf("Filename is %s\n", file_name);
   token = strtok_r(file_name, " ", &save_ptr);
+  
+  //Throw out first token
+  token = strtok_r(NULL, " ", &save_ptr);
+
   //https://stackoverflow.com/questions/6987217/strncpy-or-strlcpy-in-my-case
   //If you use strncpy to copy a string larger than your buffer, it will not 
   //put a '\0' at the end of the buffer. If you use strlcpy, the '\0' will be
   // there, but one less char will be in your buffer. 
+  
+  //1. Parse Arguments by whitespaces
   while (token != NULL) {
-    printf("Token is %s\n", token);
+    //printf("Token is %s\n", token);
     argv[argc] = malloc(strlen(token) + 1);
     strlcpy(argv[argc++], token, strlen(token) + 1);
     token = strtok_r(NULL, " ", &save_ptr);
@@ -470,27 +478,49 @@ setup_stack (void **esp, char *file_name) {
 
   int i;
   char *ptr[argc];
-  printf("Argc: %d\n", argc);
+  //2. Write each argument in reverse including \0
   for (i = argc - 1; i >= 0; i--) {
     *esp -= strlen(argv[i]) + 1;
-    printf("Before pfault\n");
+    ptr[i] = *esp;
     memcpy(*esp, argv[i], strlen(argv[i]) + 1);
-    printf("%d\t %s\t %d\n", i, argv[i], strlen(argv[i]));
+  }
+
+  //Word align to 4 bytes
+  while ((int)*esp % 4 != 0) {
+    *esp -= 1;
+    memset(*esp, (uint8_t)0, 1);
+  }
+
+  //Write four 0's as last argument
+  *esp -= 4;
+  memset(*esp, (char *)0, 4);
+
+  //write address of each argument
+  for (i = argc - 1; i >= 0; i--) {
+    *esp -= sizeof(ptr[i]); //4
+    memcpy(*esp, &ptr[i], sizeof(ptr[i]));
+    if (i == 0) {
+      char *stackHold = *esp;
+      *esp -= sizeof(char *);
+      memcpy(*esp, &stackHold, sizeof(char *));
+    }
+  }
+
+  //write argc
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof(int));
+
+  //write a 0 for the return address
+  *esp -= sizeof(void *);
+  memset(*esp, (void *) 0, sizeof(void *));
+
+
+  for (i = 0; i < argc; i++) {
+    free(argv[i]);
   }
   hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
 
-  /*
-  bfffffe0                          65 63 68 6f 00 2f 62 69 |        echo./bi|
-bffffff0  6e 2f 6c 73 00 2d 6c 00-66 6f 6f 00 62 61 72 00 |n/ls.-l.foo.bar.|
-Page fault at 0x736c2f6e: not present error reading page in user context.
-echo /bin/ls -l: dying due to interrupt 0x0e (#PF Page-Fault Exception).
-Interrupt 0x0e (#PF Page-Fault Exception) at eip=0x80480bb
- cr2=736c2f6e error=00000004
- eax=69622f00 ebx=00000000 ecx=00000000 edx=00000000
- esi=69622f00 edi=736c2f6e esp=bfffffa0 ebp=bfffffc4
- cs=001b ds=0023 es=0023 ss=0023
- */
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
