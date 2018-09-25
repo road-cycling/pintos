@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -189,7 +190,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char *);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -217,8 +218,13 @@ load (const char *file_name, void (**eip) (void), void **esp) {
     goto done;
   process_activate ();
 
+  char *token, *save_ptr;
+  char *file_n = malloc(strlen(file_name) + 1);
+  strlcpy(file_n, file_name, strlen(file_name));
+  token = strtok_r(file_n, " ", &save_ptr);
+
   /* Open executable file. */
-  file = filesys_open (file_name);
+  file = filesys_open (token);
   //printf("Opened file\n");
   if (file == NULL) {
       printf ("load: %s: open failed\n", file_name);
@@ -239,7 +245,7 @@ load (const char *file_name, void (**eip) (void), void **esp) {
       goto done; 
     }
     //printf("Passed\n");
-    printf("Passed\n");
+    //printf("Passed\n");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
@@ -300,7 +306,7 @@ load (const char *file_name, void (**eip) (void), void **esp) {
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, file_name))
     goto done;
 
   /* Start address. */
@@ -311,6 +317,7 @@ load (const char *file_name, void (**eip) (void), void **esp) {
  done:
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  free(file_n);
   return success;
 }
 
@@ -425,27 +432,65 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) {
+setup_stack (void **esp, char *file_name) {
   printf("Setting up stack\n");
-  // printf("%d, %c, %d, %d, %x\n", *esp, *esp - 1, *esp - 2, *esp - 3, *esp -4);
-  // printf("%x, %x, %x, %x, %x\n", *esp - 5, *esp - 6, *esp - 7, *esp - 8, *esp - 9);
-  // printf("%x, %x, %x\n", *esp - 10, *esp - 11, *esp - 12);
-  //hex_dump(0, *esp, 200, true);
+
   uint8_t *kpage;
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
+  if (kpage != NULL) {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success) {
-        //hex_dump(0, *esp, 12, true);
-        *esp = PHYS_BASE - 12;
+        *esp = PHYS_BASE;
+        printf("PHYS_BASE is %d\n", PHYS_BASE);
+        //*esp = PHYS_BASE - 12;
       }
-      else
+      else {
         palloc_free_page (kpage);
+      }
     }
+
+
+  char *argv[10];
+  char *token, *save_ptr;
+  int argc = 0;
+  printf("Filename is %s\n", file_name);
+  token = strtok_r(file_name, " ", &save_ptr);
+  //https://stackoverflow.com/questions/6987217/strncpy-or-strlcpy-in-my-case
+  //If you use strncpy to copy a string larger than your buffer, it will not 
+  //put a '\0' at the end of the buffer. If you use strlcpy, the '\0' will be
+  // there, but one less char will be in your buffer. 
+  while (token != NULL) {
+    printf("Token is %s\n", token);
+    argv[argc] = malloc(strlen(token) + 1);
+    strlcpy(argv[argc++], token, strlen(token) + 1);
+    token = strtok_r(NULL, " ", &save_ptr);
+  }
+
+  int i;
+  char *ptr[argc];
+  printf("Argc: %d\n", argc);
+  for (i = argc - 1; i >= 0; i--) {
+    *esp -= strlen(argv[i]) + 1;
+    printf("Before pfault\n");
+    memcpy(*esp, argv[i], strlen(argv[i]) + 1);
+    printf("%d\t %s\t %d\n", i, argv[i], strlen(argv[i]));
+  }
+  hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
+
+  /*
+  bfffffe0                          65 63 68 6f 00 2f 62 69 |        echo./bi|
+bffffff0  6e 2f 6c 73 00 2d 6c 00-66 6f 6f 00 62 61 72 00 |n/ls.-l.foo.bar.|
+Page fault at 0x736c2f6e: not present error reading page in user context.
+echo /bin/ls -l: dying due to interrupt 0x0e (#PF Page-Fault Exception).
+Interrupt 0x0e (#PF Page-Fault Exception) at eip=0x80480bb
+ cr2=736c2f6e error=00000004
+ eax=69622f00 ebx=00000000 ecx=00000000 edx=00000000
+ esi=69622f00 edi=736c2f6e esp=bfffffa0 ebp=bfffffc4
+ cs=001b ds=0023 es=0023 ss=0023
+ */
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
