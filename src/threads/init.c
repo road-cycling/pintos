@@ -74,8 +74,7 @@ int main (void) NO_RETURN;
 
 /* Pintos main program. */
 int
-main (void)
-{
+main (void) {
   char **argv;
 
   /* Clear BSS. */  
@@ -157,10 +156,10 @@ bss_init (void)
 static void
 paging_init (void)
 {
+ // for (;;);
   uint32_t *pd, *pt;
   size_t page;
   extern char _start, _end_kernel_text;
-
   pd = init_page_dir = palloc_get_page (PAL_ASSERT | PAL_ZERO);
   pt = NULL;
   for (page = 0; page < init_ram_pages; page++)
@@ -185,6 +184,8 @@ paging_init (void)
      new page tables immediately.  See [IA32-v2a] "MOV--Move
      to/from Control Registers" and [IA32-v3a] 3.7.5 "Base Address
      of the Page Directory". */
+  //printf("Init paging \n");
+     //for (;;) {}
   asm volatile ("movl %0, %%cr3" : : "r" (vtop (init_page_dir)));
 }
 

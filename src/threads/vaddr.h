@@ -4,6 +4,7 @@
 #include <debug.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdlib.h>
 
 #include "threads/loader.h"
 
@@ -61,8 +62,12 @@ is_user_vaddr (const void *vaddr)
 
 /* Returns true if VADDR is a kernel virtual address. */
 static inline bool
-is_kernel_vaddr (const void *vaddr) 
-{
+is_kernel_vaddr (const void *vaddr) {
+  //debug_backtrace();
+  //printf("%p >= %p\n", vaddr, PHYS_BASE);
+  //debug_backtrace_all();
+  //debug_backtrace();
+
   return vaddr >= PHYS_BASE;
 }
 
@@ -79,8 +84,8 @@ ptov (uintptr_t paddr)
 /* Returns physical address at which kernel virtual address VADDR
    is mapped. */
 static inline uintptr_t
-vtop (const void *vaddr)
-{
+vtop (const void *vaddr) {
+  //printf("vaddr %p\n", vaddr);
   ASSERT (is_kernel_vaddr (vaddr));
 
   return (uintptr_t) vaddr - (uintptr_t) PHYS_BASE;

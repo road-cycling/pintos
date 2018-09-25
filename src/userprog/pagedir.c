@@ -99,7 +99,8 @@ bool
 pagedir_set_page (uint32_t *pd, void *upage, void *kpage, bool writable)
 {
   uint32_t *pte;
-
+  //for (;;);
+  //printf("Setting page in page directory\n");
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (pg_ofs (kpage) == 0);
   ASSERT (is_user_vaddr (upage));
@@ -219,14 +220,17 @@ pagedir_set_accessed (uint32_t *pd, const void *vpage, bool accessed)
 void
 pagedir_activate (uint32_t *pd) 
 {
-  if (pd == NULL)
+  if (pd == NULL) {
     pd = init_page_dir;
-
+  }
+  //printf("*pd = %d\n", pd);
   /* Store the physical address of the page directory into CR3
      aka PDBR (page directory base register).  This activates our
      new page tables immediately.  See [IA32-v2a] "MOV--Move
      to/from Control Registers" and [IA32-v3a] 3.7.5 "Base
      Address of the Page Directory". */
+     //printf("Found error\n");
+    //for (;;);
   asm volatile ("movl %0, %%cr3" : : "r" (vtop (pd)) : "memory");
 }
 

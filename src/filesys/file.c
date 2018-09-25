@@ -18,15 +18,12 @@ struct file *
 file_open (struct inode *inode) 
 {
   struct file *file = calloc (1, sizeof *file);
-  if (inode != NULL && file != NULL)
-    {
+  if (inode != NULL && file != NULL) {
       file->inode = inode;
       file->pos = 0;
       file->deny_write = false;
       return file;
-    }
-  else
-    {
+    } else {
       inode_close (inode);
       free (file);
       return NULL; 
@@ -70,6 +67,7 @@ file_read (struct file *file, void *buffer, off_t size)
 {
   off_t bytes_read = inode_read_at (file->inode, buffer, size, file->pos);
   file->pos += bytes_read;
+  //printf("Read %d bytes\n", bytes_read);
   return bytes_read;
 }
 

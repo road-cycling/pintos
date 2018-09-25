@@ -770,13 +770,10 @@ allocate_tid (void)
 {
   static tid_t next_tid = 1;
   tid_t tid;
-  //printf("in allocate_tid\n");
-  //lock_acquire_safe (&tid_lock);
+
   lock_acquire(&tid_lock);
-  //printf("Got lock\n");
   tid = next_tid++;
   lock_release (&tid_lock);
-  //printf("Released lock\n");
   return tid;
 }
 

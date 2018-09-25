@@ -25,12 +25,10 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
-tid_t
-process_execute (const char *file_name) 
-{
+tid_t process_execute (const char *file_name) {
   char *fn_copy;
   tid_t tid;
-
+  //printf("Process name is %d\n", file_name);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -92,17 +90,14 @@ process_wait (tid_t child_tid UNUSED)
 }
 
 /* Free the current process's resources. */
-void
-process_exit (void)
-{
+void process_exit (void) {
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
-  if (pd != NULL) 
-    {
+  if (pd != NULL) {
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
@@ -111,6 +106,7 @@ process_exit (void)
          directory, or our active page directory will be one
          that's been freed (and cleared). */
       cur->pagedir = NULL;
+      //printf("Calling process exit\n");
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
@@ -120,10 +116,8 @@ process_exit (void)
    thread.
    This function is called on every context switch. */
 void
-process_activate (void)
-{
+process_activate (void) {
   struct thread *t = thread_current ();
-
   /* Activate thread's page tables. */
   pagedir_activate (t->pagedir);
 
@@ -206,8 +200,10 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
-{
+load (const char *file_name, void (**eip) (void), void **esp) {
+  //hex_dump(0, file_name, sizeof(file_name), NULL);
+  //printf("Load is called\n");
+  printf("File name is %s\n", file_name);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -223,11 +219,11 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   file = filesys_open (file_name);
-  if (file == NULL) 
-    {
+  //printf("Opened file\n");
+  if (file == NULL) {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
-    }
+    } 
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -236,12 +232,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_machine != 3
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
-      || ehdr.e_phnum > 1024) 
-    {
-      printf ("load: %s: error loading executable\n", file_name);
+      || ehdr.e_phnum > 1024) {
+      //hex_dump(0, ehdr.e_ident, 500, true);
+     // printf("%d\n", ehdr.e_phnum);
+      printf("Unable to read file\n");
       goto done; 
     }
-
+    //printf("Passed\n");
+    printf("Passed\n");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
@@ -381,8 +379,8 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    or disk read error occurs. */
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
-              uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
-{
+              uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+  printf("Loading segment\n");
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
@@ -427,8 +425,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
 static bool
-setup_stack (void **esp) 
-{
+setup_stack (void **esp) {
+  printf("Setting up stack\n");
+  // printf("%d, %c, %d, %d, %x\n", *esp, *esp - 1, *esp - 2, *esp - 3, *esp -4);
+  // printf("%x, %x, %x, %x, %x\n", *esp - 5, *esp - 6, *esp - 7, *esp - 8, *esp - 9);
+  // printf("%x, %x, %x\n", *esp - 10, *esp - 11, *esp - 12);
+  //hex_dump(0, *esp, 200, true);
   uint8_t *kpage;
   bool success = false;
 
@@ -436,8 +438,10 @@ setup_stack (void **esp)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
-        *esp = PHYS_BASE;
+      if (success) {
+        //hex_dump(0, *esp, 12, true);
+        *esp = PHYS_BASE - 12;
+      }
       else
         palloc_free_page (kpage);
     }
