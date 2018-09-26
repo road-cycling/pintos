@@ -81,18 +81,20 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   page_idx = bitmap_scan_and_flip (pool->used_map, 0, page_cnt, false);
   lock_release (&pool->lock);
 
-  if (page_idx != BITMAP_ERROR)
+  if (page_idx != BITMAP_ERROR) {
+    // base + PGSIZE * page_idx = paddr
     pages = pool->base + PGSIZE * page_idx;
-  else
+  }
+  else {
     pages = NULL;
+  }
 
-  if (pages != NULL) 
-    {
+  if (pages != NULL) {
+      // PAL_ZERO = zero page contents
       if (flags & PAL_ZERO)
         memset (pages, 0, PGSIZE * page_cnt);
-    }
-  else 
-    {
+  }
+  else {
       if (flags & PAL_ASSERT)
         PANIC ("palloc_get: out of pages");
     }
@@ -107,19 +109,18 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
    then the page is filled with zeros.  If no pages are
    available, returns a null pointer, unless PAL_ASSERT is set in
    FLAGS, in which case the kernel panics. */
-void *
-palloc_get_page (enum palloc_flags flags) 
-{
+void *palloc_get_page (enum palloc_flags flags) {
+  //auto user pool unless flag. Set for one page
   return palloc_get_multiple (flags, 1);
 }
 
 /* Frees the PAGE_CNT pages starting at PAGES. */
-void
-palloc_free_multiple (void *pages, size_t page_cnt) 
-{
+void palloc_free_multiple (void *pages, size_t page_cnt) {
   struct pool *pool;
   size_t page_idx;
 
+  //Bitmask to return 0:12 "Page Offset"
+  //Need to be at beginning of the page
   ASSERT (pg_ofs (pages) == 0);
   if (pages == NULL || page_cnt == 0)
     return;
@@ -131,13 +132,16 @@ palloc_free_multiple (void *pages, size_t page_cnt)
   else
     NOT_REACHED ();
 
+  // virtual page number */
   page_idx = pg_no (pages) - pg_no (pool->base);
 
 #ifndef NDEBUG
   memset (pages, 0xcc, PGSIZE * page_cnt);
 #endif
 
+  //Returns true if every bit between page_idx and page_cnt is set, false otherwise
   ASSERT (bitmap_all (pool->used_map, page_idx, page_cnt));
+  //bit flipping time
   bitmap_set_multiple (pool->used_map, page_idx, page_cnt, false);
 }
 

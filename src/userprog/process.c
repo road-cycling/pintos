@@ -18,6 +18,7 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+//#include "threads/pte.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -209,6 +210,16 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   off_t file_ofs;
   bool success = false;
   int i;
+
+  // printf("Page Table Index (bits 12:21)\n");
+  // printf("PTBITS: %d\n", PTBITS);
+  // printf("PTSPAN: %d\n", PTSPAN);
+  // printf("PTMASK: %x\n", PTMASK);
+
+  // printf("Page Directory Index (bits 22:31)\n");
+  // printf("PDSHIFT: %d\n", PDSHIFT);
+  // printf("PDBITS: %d\n", PDBITS);
+  // printf("PDMASK: %x\n", PDMASK);
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
