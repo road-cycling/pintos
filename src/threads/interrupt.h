@@ -4,6 +4,20 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/*
+    When an interrupt occurs, the CPU saves its most essential
+    state on a stack and jumps to an interrupt handler routine.
+
+    intr_init() sets up the Interrupt Descriptor Table so each
+    entry points to a unique entry point intrHEX_stub(). 
+
+    The interrupt number is pushed on the stack, *eip jumps to
+    intr_entry() which pushes all the registers that werent already
+    pushed. It then calls intr handler.
+
+
+*/
+
 /* Interrupts on or off? */
 enum intr_level 
   {

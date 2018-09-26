@@ -17,6 +17,8 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "threads/malloc.h"
+//#include "threads/pte.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -25,12 +27,10 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
    FILENAME.  The new thread may be scheduled (and may even exit)
    before process_execute() returns.  Returns the new process's
    thread id, or TID_ERROR if the thread cannot be created. */
-tid_t
-process_execute (const char *file_name) 
-{
+tid_t process_execute (const char *file_name) {
   char *fn_copy;
   tid_t tid;
-
+  //printf("Process name is %d\n", file_name);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
@@ -92,17 +92,14 @@ process_wait (tid_t child_tid UNUSED)
 }
 
 /* Free the current process's resources. */
-void
-process_exit (void)
-{
+void process_exit (void) {
   struct thread *cur = thread_current ();
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
-  if (pd != NULL) 
-    {
+  if (pd != NULL) {
       /* Correct ordering here is crucial.  We must set
          cur->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
@@ -111,6 +108,7 @@ process_exit (void)
          directory, or our active page directory will be one
          that's been freed (and cleared). */
       cur->pagedir = NULL;
+      //printf("Calling process exit\n");
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
@@ -120,10 +118,8 @@ process_exit (void)
    thread.
    This function is called on every context switch. */
 void
-process_activate (void)
-{
+process_activate (void) {
   struct thread *t = thread_current ();
-
   /* Activate thread's page tables. */
   pagedir_activate (t->pagedir);
 
@@ -195,7 +191,7 @@ struct Elf32_Phdr
 #define PF_W 2          /* Writable. */
 #define PF_R 4          /* Readable. */
 
-static bool setup_stack (void **esp);
+static bool setup_stack (void **esp, char *);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
@@ -206,8 +202,8 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
 bool
-load (const char *file_name, void (**eip) (void), void **esp) 
-{
+load (const char *file_name, void (**eip) (void), void **esp) {
+
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -215,19 +211,38 @@ load (const char *file_name, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 
+  // printf("Page Table Index (bits 12:21)\n");
+  // printf("PTBITS: %d\n", PTBITS);
+  // printf("PTSPAN: %d\n", PTSPAN);
+  // printf("PTMASK: %x\n", PTMASK);
+
+  // printf("Page Directory Index (bits 22:31)\n");
+  // printf("PDSHIFT: %d\n", PDSHIFT);
+  // printf("PDBITS: %d\n", PDBITS);
+  // printf("PDMASK: %x\n", PDMASK);
+
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
     goto done;
   process_activate ();
 
+  //Attempting to pass arguments to a program
+  //will include those arguments in the name of
+  //the program, which will probably fail
+
+  char *token, *save_ptr;
+  char *file_n = malloc(strlen(file_name) + 1);
+  strlcpy(file_n, file_name, strlen(file_name));
+  token = strtok_r(file_n, " ", &save_ptr);
+
   /* Open executable file. */
-  file = filesys_open (file_name);
-  if (file == NULL) 
-    {
+  file = filesys_open (token);
+  //printf("Opened file\n");
+  if (file == NULL) {
       printf ("load: %s: open failed\n", file_name);
       goto done; 
-    }
+    } 
 
   /* Read and verify executable header. */
   if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -236,12 +251,14 @@ load (const char *file_name, void (**eip) (void), void **esp)
       || ehdr.e_machine != 3
       || ehdr.e_version != 1
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
-      || ehdr.e_phnum > 1024) 
-    {
-      printf ("load: %s: error loading executable\n", file_name);
+      || ehdr.e_phnum > 1024) {
+      //hex_dump(0, ehdr.e_ident, 500, true);
+     // printf("%d\n", ehdr.e_phnum);
+      printf("Unable to read file\n");
       goto done; 
     }
-
+    //printf("Passed\n");
+    //printf("Passed\n");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
@@ -302,7 +319,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp))
+  if (!setup_stack (esp, file_name))
     goto done;
 
   /* Start address. */
@@ -312,7 +329,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
  done:
   /* We arrive here whether the load is successful or not. */
+  //printf("In done\n");
   file_close (file);
+  free(file_n);
   return success;
 }
 
@@ -381,8 +400,8 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    or disk read error occurs. */
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
-              uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
-{
+              uint32_t read_bytes, uint32_t zero_bytes, bool writable) {
+  //printf("Loading segment\n");
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
@@ -426,22 +445,93 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-static bool
-setup_stack (void **esp) 
-{
+static bool setup_stack (void **esp, char *file_name) {
+  //printf("Setting up stack\n");
+
   uint8_t *kpage;
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
-  if (kpage != NULL) 
-    {
+  if (kpage != NULL) {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success) {
         *esp = PHYS_BASE;
-      else
+        //printf("PHYS_BASE is %d\n", PHYS_BASE);
+       // *esp = PHYS_BASE - 12;
+      }
+      else {
         palloc_free_page (kpage);
+      }
     }
+
+
+  //max 10 args 
+  char *argv[10];
+  char *token, *save_ptr;
+  int argc = 0;
+  token = strtok_r(file_name, " ", &save_ptr);
+  
+  //Throw out first token
+  token = strtok_r(NULL, " ", &save_ptr);
+
+  //https://stackoverflow.com/questions/6987217/strncpy-or-strlcpy-in-my-case
+  //If you use strncpy to copy a string larger than your buffer, it will not 
+  //put a '\0' at the end of the buffer. If you use strlcpy, the '\0' will be
+  // there, but one less char will be in your buffer. 
+  
+  //1. Parse Arguments by whitespaces
+  while (token != NULL) {
+    //printf("Token is %s\n", token);
+    argv[argc] = malloc(strlen(token) + 1);
+    strlcpy(argv[argc++], token, strlen(token) + 1);
+    token = strtok_r(NULL, " ", &save_ptr);
+  }
+
+  int i;
+  char *ptr[argc];
+  //2. Write each argument in reverse including \0
+  for (i = argc - 1; i >= 0; i--) {
+    *esp -= strlen(argv[i]) + 1;
+    ptr[i] = *esp;
+    memcpy(*esp, argv[i], strlen(argv[i]) + 1);
+  }
+
+  //Word align to 4 bytes
+  while ((int)*esp % 4 != 0) {
+    *esp -= 1;
+    memset(*esp, (uint8_t)0, 1);
+  }
+
+  //Write four 0's as last argument
+  *esp -= 4;
+  memset(*esp, (char *)0, 4);
+
+  //write address of each argument
+  for (i = argc - 1; i >= 0; i--) {
+    *esp -= sizeof(ptr[i]); //4
+    memcpy(*esp, &ptr[i], sizeof(ptr[i]));
+    if (i == 0) {
+      char *stackHold = *esp;
+      *esp -= sizeof(char *);
+      memcpy(*esp, &stackHold, sizeof(char *));
+    }
+  }
+
+  //write argc
+  *esp -= sizeof(int);
+  memcpy(*esp, &argc, sizeof(int));
+
+  //write a 0 for the return address
+  *esp -= sizeof(void *);
+  memset(*esp, (void *) 0, sizeof(void *));
+
+
+  for (i = 0; i < argc; i++) {
+    free(argv[i]);
+  }
+  hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
+
 }
 
 /* Adds a mapping from user virtual address UPAGE to kernel
