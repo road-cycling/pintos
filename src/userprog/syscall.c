@@ -37,13 +37,11 @@ void syscall_init (void) {
 static void syscall_handler (struct intr_frame *f) {
 
   uint32_t *args = ((uint32_t *) f->esp);
-  printf("Sys call number: %d\n", args[0]);
+  printf("Sys call number: %d ... \n", args[0]);
 
   if (args[0] == SYS_WRITE) {
-    debug_backtrace();
-    printf("fd = %d\n", args[1]);
-    printf("size = %d\n", args[3]);
-    //f->eax = write(args);
+    f->eax = write(args);
+
   }
 
   if (args[0] == SYS_EXIT) {
@@ -69,26 +67,44 @@ main (int argc, char **argv)
 
 */
 
+// #define syscall3(NUMBER, ARG0, ARG1, ARG2)                      \
+//         ({                                                      \
+//           int retval;                                           \
+//           asm volatile                                          \
+//             ("pushl %[arg2]; pushl %[arg1]; pushl %[arg0]; "    \
+//              "pushl %[number]; int $0x30; addl $16, %%esp"      \
+//                : "=a" (retval)                                  \
+//                : [number] "i" (NUMBER),                         \
+//                  [arg0] "g" (ARG0),                             \
+//                  [arg1] "g" (ARG1),                             \
+//                  [arg2] "g" (ARG2)                              \
+//                : "memory");                                     \
+//           retval;                                               \
+//         })
+
+// int
+// write (int fd, const void *buffer, unsigned size) {
+//   return syscall3 (SYS_WRITE, fd, buffer, size);
+// }
+//size
+//buffer
+//fd/
+//number
+
 int write(uint32_t *args) {
-    //pushl long 4 bytes
-    //int fd, const void *buffer, unsigned size;
-    // int fd = args[1];
-    // char *buffer =(char*) args[2];
-    // unsigned size = args[3];
-    //printf("FD %d\n && Buffer: %s\n", fd, *buffer);
+  
+  int sysCallNumber = (int) args[0];
+  int fd = (int) args[1];
+  char *buffer = (char *) args[2];
+  unsigned size = (unsigned) args[3];
 
-    //printf("Buffer is %c\n")
+  printf("Syscall #%d\n", sysCallNumber);
+  printf("FD: %d\n", fd);
+  printf("Size: %d\n", size);
 
-    //printf("%d\t%s\t%d\n", fd, buffer, size)
+  printf("Buffer is %s\n", *buffer);
 
-    // printf("File Descriptor is %d\n", *(args + 1));
-    // //printf("File Descriptor is %d\n", fd);
-    // printf("Data is %s\n", buffer);
-    // printf("Size is %d\n", *(args + 3));
-    // printf("\n");
-    //printf("FD: %d\tBuffer %p\tSize: %d\n", fd, buffer, size);
-    //printf("Called write\n");
-    return 1;
+  return 1;
 }
 
 /* 
