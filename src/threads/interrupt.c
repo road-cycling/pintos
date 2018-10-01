@@ -114,9 +114,7 @@ intr_disable (void)
 }
 
 /* Initializes the interrupt system. */
-void
-intr_init (void)
-{
+void intr_init (void) {
   uint64_t idtr_operand;
   int i;
 
@@ -235,8 +233,7 @@ intr_yield_on_return (void)
    interrupts 0...15 are delivered to interrupt vectors 32...47
    (0x20...0x2f) instead. */
 static void
-pic_init (void)
-{
+pic_init (void) {
   /* Mask all interrupts on both PICs. */
   outb (PIC0_DATA, 0xff);
   outb (PIC1_DATA, 0xff);

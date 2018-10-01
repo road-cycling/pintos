@@ -18,8 +18,11 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 //#include "threads/pte.h"
 
+// @ berkeley skeleton has sema temp
+static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -30,6 +33,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t process_execute (const char *file_name) {
   char *fn_copy;
   tid_t tid;
+  sema_init(&temporary, 0);
   //printf("Process name is %d\n", file_name);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -86,8 +90,8 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
-{
+process_wait (tid_t child_tid UNUSED) {
+  sema_down(&temporary);
   return -1;
 }
 
@@ -112,6 +116,7 @@ void process_exit (void) {
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    sema_up(&temporary);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -201,8 +206,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
-bool
-load (const char *file_name, void (**eip) (void), void **esp) {
+bool load (const char *file_name, void (**eip) (void), void **esp) {
 
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -529,7 +533,7 @@ static bool setup_stack (void **esp, char *file_name) {
   for (i = 0; i < argc; i++) {
     free(argv[i]);
   }
-  hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+  //hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
 
 }
