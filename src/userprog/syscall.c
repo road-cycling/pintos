@@ -44,6 +44,10 @@ static void syscall_handler (struct intr_frame *f) {
 
   }
 
+  if (args[0] == SYS_OPEN) {
+    printf("Called open\n");
+  }
+
   if (args[0] == SYS_EXIT) {
     f->eax = args[1];
     printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
@@ -102,7 +106,7 @@ int write(uint32_t *args) {
   printf("FD: %d\n", fd);
   printf("Size: %d\n", size);
 
-  printf("Buffer is %s\n", *buffer);
+  printf("Buffer is %p\n", buffer);
 
   return 1;
 }
