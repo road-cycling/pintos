@@ -18,8 +18,11 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 //#include "threads/pte.h"
 
+// @ berkeley skeleton has sema temp
+static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -30,13 +33,19 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t process_execute (const char *file_name) {
   char *fn_copy;
   tid_t tid;
-  //printf("Process name is %d\n", file_name);
+  sema_init(&temporary, 0);
+
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  char *save_ptr;
+  //printf("Process File_Name is %s\n", file_name);
+  file_name = strtok_r(file_name, " ", &save_ptr);
+  //printf("Process File_Name is %s\n", file_name);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -48,8 +57,7 @@ tid_t process_execute (const char *file_name) {
 /* A thread function that loads a user process and starts it
    running. */
 static void
-start_process (void *file_name_)
-{
+start_process (void *file_name_) {
   char *file_name = file_name_;
   struct intr_frame if_;
   bool success;
@@ -59,12 +67,15 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
+  //printf("File_Name is %s\n", file_name);
   success = load (file_name, &if_.eip, &if_.esp);
 
   /* If load failed, quit. */
   palloc_free_page (file_name);
-  if (!success) 
+  if (!success) {
     thread_exit ();
+  }
+  //printf("Start process end\n");
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -86,8 +97,11 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
-{
+process_wait (tid_t child_tid UNUSED) {
+  sema_down(&temporary);
+  // while (true) {
+  //   thread_yield();
+  // }
   return -1;
 }
 
@@ -112,6 +126,7 @@ void process_exit (void) {
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    sema_up(&temporary);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -201,8 +216,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
    Stores the executable's entry point into *EIP
    and its initial stack pointer into *ESP.
    Returns true if successful, false otherwise. */
-bool
-load (const char *file_name, void (**eip) (void), void **esp) {
+bool load (const char *file_name, void (**eip) (void), void **esp) {
 
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
@@ -233,14 +247,15 @@ load (const char *file_name, void (**eip) (void), void **esp) {
 
   char *token, *save_ptr;
   char *file_n = malloc(strlen(file_name) + 1);
-  strlcpy(file_n, file_name, strlen(file_name));
+  strlcpy(file_n, file_name, strlen(file_name) + 1);
   token = strtok_r(file_n, " ", &save_ptr);
 
   /* Open executable file. */
+  //printf("Token is %s\n", token);
   file = filesys_open (token);
   //printf("Opened file\n");
   if (file == NULL) {
-      printf ("load: %s: open failed\n", file_name);
+      //printf ("load: %s: open failed\n", file_name);
       goto done; 
     } 
 
@@ -254,7 +269,7 @@ load (const char *file_name, void (**eip) (void), void **esp) {
       || ehdr.e_phnum > 1024) {
       //hex_dump(0, ehdr.e_ident, 500, true);
      // printf("%d\n", ehdr.e_phnum);
-      printf("Unable to read file\n");
+      //printf("Unable to read file\n");
       goto done; 
     }
     //printf("Passed\n");
@@ -329,7 +344,6 @@ load (const char *file_name, void (**eip) (void), void **esp) {
 
  done:
   /* We arrive here whether the load is successful or not. */
-  //printf("In done\n");
   file_close (file);
   free(file_n);
   return success;
@@ -457,35 +471,39 @@ static bool setup_stack (void **esp, char *file_name) {
       if (success) {
         *esp = PHYS_BASE;
         //printf("PHYS_BASE is %d\n", PHYS_BASE);
-       // *esp = PHYS_BASE - 12;
+        //*esp = PHYS_BASE - 12;
       }
       else {
         palloc_free_page (kpage);
       }
     }
 
+  //return success;
 
+    /* Start Here */
   //max 10 args 
-  char *argv[10];
+  char *argv[20];
   char *token, *save_ptr;
   int argc = 0;
   token = strtok_r(file_name, " ", &save_ptr);
-  
-  //Throw out first token
-  token = strtok_r(NULL, " ", &save_ptr);
 
   //https://stackoverflow.com/questions/6987217/strncpy-or-strlcpy-in-my-case
   //If you use strncpy to copy a string larger than your buffer, it will not 
   //put a '\0' at the end of the buffer. If you use strlcpy, the '\0' will be
   // there, but one less char will be in your buffer. 
   
+
+  //return true;
   //1. Parse Arguments by whitespaces
   while (token != NULL) {
+    //printf("Token is %s\n", token);
     //printf("Token is %s\n", token);
     argv[argc] = malloc(strlen(token) + 1);
     strlcpy(argv[argc++], token, strlen(token) + 1);
     token = strtok_r(NULL, " ", &save_ptr);
   }
+
+  // //return true;
 
   int i;
   char *ptr[argc];
@@ -499,37 +517,40 @@ static bool setup_stack (void **esp, char *file_name) {
   //Word align to 4 bytes
   while ((int)*esp % 4 != 0) {
     *esp -= 1;
-    memset(*esp, (uint8_t)0, 1);
+    memset(*esp, /*(uint8_t)*/0, 1);
   }
 
   //Write four 0's as last argument
   *esp -= 4;
-  memset(*esp, (char *)0, 4);
+  memset(*esp, /*(char *)*/0, 4);
 
-  //write address of each argument
+  // //write address of each argument
   for (i = argc - 1; i >= 0; i--) {
     *esp -= sizeof(ptr[i]); //4
     memcpy(*esp, &ptr[i], sizeof(ptr[i]));
     if (i == 0) {
       char *stackHold = *esp;
       *esp -= sizeof(char *);
-      memcpy(*esp, &stackHold, sizeof(char *));
+      memcpy(*esp, &stackHold, sizeof(char **));
     }
   }
 
-  //write argc
+  // //write argc
   *esp -= sizeof(int);
   memcpy(*esp, &argc, sizeof(int));
 
   //write a 0 for the return address
   *esp -= sizeof(void *);
-  memset(*esp, (void *) 0, sizeof(void *));
+  memset(*esp, /*(void *)*/ 0, sizeof(void *));
 
 
   for (i = 0; i < argc; i++) {
     free(argv[i]);
   }
-  hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
+
+  //printf("SP: %p\n", *esp);
+
+  //hex_dump(*esp, *esp, PHYS_BASE - *esp, true);
   return success;
 
 }
@@ -553,3 +574,4 @@ install_page (void *upage, void *kpage, bool writable)
   return (pagedir_get_page (t->pagedir, upage) == NULL
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
+

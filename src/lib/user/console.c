@@ -6,8 +6,8 @@
 /* The standard vprintf() function,
    which is like printf() but uses a va_list. */
 int
-vprintf (const char *format, va_list args) 
-{
+vprintf (const char *format, va_list args) {
+  //for (;;);
   return vhprintf (STDOUT_FILENO, format, args);
 }
 
@@ -88,7 +88,10 @@ add_char (char c, void *aux_)
 static void
 flush (struct vhprintf_aux *aux)
 {
-  if (aux->p > aux->buf)
+  if (aux->p > aux->buf) {
     write (aux->handle, aux->buf, aux->p - aux->buf);
+    //for (;;) {}
+    //write(0, aux->buf, 0);
+  }
   aux->p = aux->buf;
 }

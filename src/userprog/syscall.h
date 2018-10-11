@@ -1,6 +1,13 @@
 #ifndef USERPROG_SYSCALL_H
 #define USERPROG_SYSCALL_H
 
+//#include <inttypes.h>
+//#include <sys/types.h>
+#include <stdbool.h>
+#include <stdio.h>
+
+typedef int pid_t;
+
 void syscall_init (void);
 
 // Terminates Pintos by calling shutdown_power_off() /devices/shutdown.h
@@ -20,7 +27,7 @@ void exit(int status);
 // program cannot execute for any reason.
 // pg30 appropriate synch (cant return until we know the child
 // successfully loaded executable)
-pid_t exec(const char *cmd_line);
+//pid_t exec(const char *cmd_line);
 
 
 //Waits for a child process pid and retrieves the child's exist status.
@@ -50,7 +57,8 @@ bool remove(const char *file);
 // When a single file is opened more than once, each open returns a separate fd
 // do not share file position (gondree mentioned . research)
 // closed independently different calls to close
-int open (const char *file);
+//int open (const char *file);
+int open(uint32_t *sp);
 
 // Returns the size, in bytes of the file open as fd
 // check pcb (?) what to do?
@@ -70,8 +78,8 @@ int read(int fd, void *buffer, unsigned size);
 // fd 1 write to the console. 
 // write all of bufer in one call to putbuf()
 // as long as its not bigger than a few hundredbytes
-int write(int fd, const void * buffer, unsigned size);
-
+//int write(int fd, const void * buffer, unsigned size);
+//int write(uint32_t *args);
 
 // Changes the next byte to be read or written in open file fd to position
 // expressed in bytes from the beginning of the file (position of 0 is start)
