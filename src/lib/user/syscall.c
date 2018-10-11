@@ -1,5 +1,6 @@
 #include <syscall.h>
 #include "../syscall-nr.h"
+#include <stdlib.h>
 
 /* Invokes syscall NUMBER, passing no arguments, and returns the
    return value as an `int'. */
@@ -61,6 +62,19 @@
           retval;                                               \
         })
 
+
+#define syscall4(NUMBER)                                       \
+        ({                                                      \
+          int retval;                                           \
+          asm volatile                                          \
+            ("pushl 0; pushl 0; pushl 0; pushl %[number];"       \
+              "int $0x30; addl $16, %%esp" \
+              : "=a" (retval) \
+              : [number] "i" (NUMBER) \
+              : "memory"); \
+            retval; \
+        })  \
+
 void
 halt (void) 
 {
@@ -119,7 +133,13 @@ read (int fd, void *buffer, unsigned size)
 
 int
 write (int fd, const void *buffer, unsigned size) {
-  return syscall3 (SYS_WRITE, fd, buffer, size);
+  //printf("Write is %d\n", fd);
+  //int test = fd - 10;
+  //for (;;);
+  //int test = fd - 10;
+  return syscall3(SYS_WRITE, fd, buffer, size);
+  //return syscall3 (SYS_WRITE, 1, buffer, 1);
+  //return syscall4(SYS_WRITE);
 }
 
 void

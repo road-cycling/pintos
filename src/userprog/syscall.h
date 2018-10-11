@@ -57,7 +57,8 @@ bool remove(const char *file);
 // When a single file is opened more than once, each open returns a separate fd
 // do not share file position (gondree mentioned . research)
 // closed independently different calls to close
-int open (const char *file);
+//int open (const char *file);
+int open(uint32_t *sp);
 
 // Returns the size, in bytes of the file open as fd
 // check pcb (?) what to do?
@@ -78,7 +79,7 @@ int read(int fd, void *buffer, unsigned size);
 // write all of bufer in one call to putbuf()
 // as long as its not bigger than a few hundredbytes
 //int write(int fd, const void * buffer, unsigned size);
-int write(uint32_t *args);
+//int write(uint32_t *args);
 
 // Changes the next byte to be read or written in open file fd to position
 // expressed in bytes from the beginning of the file (position of 0 is start)

@@ -3,7 +3,9 @@
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/vaddr.h"
 
+//static int write(uint32_t *args);
 
 static void syscall_handler (struct intr_frame *);
 
@@ -36,23 +38,43 @@ void syscall_init (void) {
 
 static void syscall_handler (struct intr_frame *f) {
 
-  uint32_t *args = ((uint32_t *) f->esp);
-  printf("Sys call number: %d ... \n", args[0]);
+  //printf("Syscall\n");
 
-  if (args[0] == SYS_WRITE) {
-    f->eax = write(args);
-
+  switch (*(int *)f->esp) {
+    case SYS_EXIT: {
+      printf("SysExit\n");
+      f->eax = 1;
+      break;
+    }
+    case SYS_WRITE: {
+      printf("SYS WRITE\n");
+      int fd = *((int *)f->esp + 1);
+      void *buffer = (void *) (*((int *)f->esp + 2));
+      unsigned size = *((unsigned *)f->esp + 3);
+      printf("FD: %d\t Size: %d\n", fd, size);
+      f->eax = 1;
+      break;
+    }
   }
 
-  if (args[0] == SYS_OPEN) {
-    printf("Called open\n");
-  }
+  //printf("SysCall\n");
 
-  if (args[0] == SYS_EXIT) {
-    f->eax = args[1];
-    printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
-    thread_exit();
-  }
+  // uint32_t *args = ((uint32_t *) f->esp);
+  
+  // if (!is_user_vaddr(args)) {
+  //   printf("ERROR\n");
+  // }
+
+  // if (args[0] == SYS_EXIT) {
+  //   f->eax = args[1];
+  //   printf("%s: exit(%d)\n", &thread_current()->name, args[1]);
+  //   thread_exit();
+  // }
+
+  // if (args[0] == SYS_WRITE) {
+
+  //   f->eax = write(args);
+  // }
 }
 
 /*
@@ -70,22 +92,22 @@ main (int argc, char **argv)
 }
 
 */
-
-// #define syscall3(NUMBER, ARG0, ARG1, ARG2)                      \
-//         ({                                                      \
-//           int retval;                                           \
-//           asm volatile                                          \
-//             ("pushl %[arg2]; pushl %[arg1]; pushl %[arg0]; "    \
-//              "pushl %[number]; int $0x30; addl $16, %%esp"      \
-//                : "=a" (retval)                                  \
-//                : [number] "i" (NUMBER),                         \
-//                  [arg0] "g" (ARG0),                             \
-//                  [arg1] "g" (ARG1),                             \
-//                  [arg2] "g" (ARG2)                              \
-//                : "memory");                                     \
-//           retval;                                               \
-//         })
-
+/*
+#define syscall3(NUMBER, ARG0, ARG1, ARG2)                      \
+        ({                                                      \
+          int retval;                                           \
+          asm volatile                                          \
+            ("pushl %[arg2]; pushl %[arg1]; pushl %[arg0]; "    \
+             "pushl %[number]; int $0x30; addl $16, %%esp"      \
+               : "=a" (retval)                                  \
+               : [number] "i" (NUMBER),                         \
+                 [arg0] "g" (ARG0),                             \
+                 [arg1] "g" (ARG1),                             \
+                 [arg2] "g" (ARG2)                              \
+               : "memory");                                     \
+          retval;                                               \
+        })
+*/
 // int
 // write (int fd, const void *buffer, unsigned size) {
 //   return syscall3 (SYS_WRITE, fd, buffer, size);
@@ -95,18 +117,20 @@ main (int argc, char **argv)
 //fd/
 //number
 
-int write(uint32_t *args) {
-  
-  int sysCallNumber = (int) args[0];
-  int fd = (int) args[1];
-  char *buffer = (char *) args[2];
-  unsigned size = (unsigned) args[3];
+/*
+gdb output
+File ../../userprog/syscall.c:
+void syscall_init(void);
+int write(uint32_t *);
+static void syscall_handler(struct intr_frame *);
+*/
 
-  printf("Syscall #%d\n", sysCallNumber);
-  printf("FD: %d\n", fd);
-  printf("Size: %d\n", size);
 
-  printf("Buffer is %p\n", buffer);
+
+
+int open(uint32_t *sp) {
+  char *buffer = (char *) sp[1];
+  printf("Buffer is %c\n", *buffer);
 
   return 1;
 }

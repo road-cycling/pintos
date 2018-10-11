@@ -124,19 +124,24 @@ sema_up (struct semaphore *sema)  {
   ASSERT (sema != NULL);
   struct thread *highestPriWaiter = NULL;
   old_level = intr_disable();
-  bool wokenUp = false;
+  //bool wokenUp = false;
   if (!list_empty (&sema->waiters)) {
-    wokenUp = true;
+    //wokenUp = true;
     list_sort(&sema->waiters, &sort_sema_wait, NULL);
     highestPriWaiter = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
     thread_unblock(highestPriWaiter);
   }
   sema->value++;
   intr_set_level (old_level);
-  if (wokenUp) {
-    //printf("yielding\n");
+
+  if (highestPriWaiter && thread_get_priority() < thread_get_other_priority(highestPriWaiter)) {
+    //printf("Yielding\n");
     thread_yield();
   }
+  //if (wokenUp) {
+    //printf("yielding\n");
+  //  thread_yield();
+  //}
 }
 
 static void sema_test_helper (void *sema_);
