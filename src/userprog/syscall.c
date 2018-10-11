@@ -16,7 +16,7 @@ void syscall_init (void) {
 
 static void syscall_handler (struct intr_frame *f) {
   //intr_dump_frame(f);
-  hex_dump(f->esp, f->esp, 20, true);  
+  //hex_dump(f->esp, f->esp, 20, true);  
   //intr_dump_frame(f->esp);
   printf ("system call!\n");
   thread_exit ();

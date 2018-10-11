@@ -18,8 +18,10 @@
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "threads/malloc.h"
+#include "threads/synch.h"
 //#include "threads/pte.h"
 
+static struct semaphore temporary;
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
@@ -33,10 +35,15 @@ tid_t process_execute (const char *file_name) {
   //printf("Process name is %d\n", file_name);
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
+  printf("Running\n");
+  sema_init(&temporary, 0);
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
+
+  char *save_ptr;
+  file_name = strtok_r(file_name, " ", &save_ptr);
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
@@ -86,9 +93,9 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
-{
-  return -1;
+process_wait (tid_t child_tid UNUSED) {
+  sema_down(&temporary);
+  return 0;
 }
 
 /* Free the current process's resources. */
@@ -112,6 +119,7 @@ void process_exit (void) {
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+    sema_up(&temporary);
 }
 
 /* Sets up the CPU for running user code in the current
@@ -211,16 +219,6 @@ load (const char *file_name, void (**eip) (void), void **esp) {
   bool success = false;
   int i;
 
-  // printf("Page Table Index (bits 12:21)\n");
-  // printf("PTBITS: %d\n", PTBITS);
-  // printf("PTSPAN: %d\n", PTSPAN);
-  // printf("PTMASK: %x\n", PTMASK);
-
-  // printf("Page Directory Index (bits 22:31)\n");
-  // printf("PDSHIFT: %d\n", PDSHIFT);
-  // printf("PDBITS: %d\n", PDBITS);
-  // printf("PDMASK: %x\n", PDMASK);
-
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
   if (t->pagedir == NULL) 
@@ -233,7 +231,7 @@ load (const char *file_name, void (**eip) (void), void **esp) {
 
   char *token, *save_ptr;
   char *file_n = malloc(strlen(file_name) + 1);
-  strlcpy(file_n, file_name, strlen(file_name));
+  strlcpy(file_n, file_name, strlen(file_name) + 1);
   token = strtok_r(file_n, " ", &save_ptr);
 
   /* Open executable file. */
@@ -472,7 +470,7 @@ static bool setup_stack (void **esp, char *file_name) {
   token = strtok_r(file_name, " ", &save_ptr);
   
   //Throw out first token
-  token = strtok_r(NULL, " ", &save_ptr);
+  //token = strtok_r(NULL, " ", &save_ptr);
 
   //https://stackoverflow.com/questions/6987217/strncpy-or-strlcpy-in-my-case
   //If you use strncpy to copy a string larger than your buffer, it will not 
@@ -499,12 +497,12 @@ static bool setup_stack (void **esp, char *file_name) {
   //Word align to 4 bytes
   while ((int)*esp % 4 != 0) {
     *esp -= 1;
-    memset(*esp, (uint8_t)0, 1);
+    memset(*esp, /*(uint8_t)*/0, 1);
   }
 
   //Write four 0's as last argument
   *esp -= 4;
-  memset(*esp, (char *)0, 4);
+  memset(*esp, /*(char *)*/0, 4);
 
   //write address of each argument
   for (i = argc - 1; i >= 0; i--) {
@@ -513,7 +511,7 @@ static bool setup_stack (void **esp, char *file_name) {
     if (i == 0) {
       char *stackHold = *esp;
       *esp -= sizeof(char *);
-      memcpy(*esp, &stackHold, sizeof(char *));
+      memcpy(*esp, &stackHold, sizeof(char **));
     }
   }
 
@@ -523,7 +521,7 @@ static bool setup_stack (void **esp, char *file_name) {
 
   //write a 0 for the return address
   *esp -= sizeof(void *);
-  memset(*esp, (void *) 0, sizeof(void *));
+  memset(*esp, /*(void *)*/ 0, sizeof(void *));
 
 
   for (i = 0; i < argc; i++) {

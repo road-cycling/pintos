@@ -20,7 +20,7 @@ void exit(int status);
 // program cannot execute for any reason.
 // pg30 appropriate synch (cant return until we know the child
 // successfully loaded executable)
-pid_t exec(const char *cmd_line);
+//pid_t exec(const char *cmd_line);
 
 
 //Waits for a child process pid and retrieves the child's exist status.
@@ -28,19 +28,19 @@ pid_t exec(const char *cmd_line);
 // that pid passed to exit. If pid did not call exit(), but was terminated by
 // the kernel (killed due to exception), wait(pid) must return -1.
 // (see more notes p30)
-int wait(pid_t pid);
+//int wait(pid_t pid);
 
 
 // creates a new file called file, initially initial_size bytes in size
 // returns true if successful, false otherwise.
 // Note: Creating a new file does not open it
 // opening the new file is a separate operation (another syscall)
-bool create(const char *file, unsigned initial_size);
+//bool create(const char *file, unsigned initial_size);
 
 //Deletes the file called file, Returns true if success / false otherwise
 // A file may be removed regardless of O / C flags
 // Removing an open file does not close it
-bool remove(const char *file);
+//bool remove(const char *file);
 
 // Opens the file called file
 // Returns a nonneg fd, or -1 if it could not be opened
